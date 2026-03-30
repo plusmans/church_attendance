@@ -1,26 +1,135 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const AttendanceApp());
+  runApp(const SungmoonApp());
 }
 
-class AttendanceApp extends StatelessWidget {
-  const AttendanceApp({super.key});
+class SungmoonApp extends StatelessWidget {
+  const SungmoonApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // 우측 상단 'DEBUG' 띠 제거
-      title: '중등부 출석부',
+      debugShowCheckedModeBanner: false,
+      title: '부천성문교회 중등부',
       theme: ThemeData(
-        primaryColor: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[100], // 앱 배경을 살짝 회색으로
+        // [디자인 1] 성문교회 느낌의 네이비 블루 메인 컬러 지정
+        primaryColor: const Color(0xFF1A237E),
+        scaffoldBackgroundColor: const Color(0xFFFDFBF7), // 따뜻한 베이지/화이트 톤 배경
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A237E)),
       ),
-      home: const AttendanceScreen(),
+      home: const LoginScreen(), // 앱을 켜면 가장 먼저 띄울 화면을 '로그인 화면'으로 설정
     );
   }
 }
 
+// ==========================================
+// [1] 로그인 화면 UI
+// ==========================================
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _idController = TextEditingController();
+  final TextEditingController _pwController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // [디자인 2] 로고 및 타이틀 영역
+              const Icon(
+                Icons.church, // 교회 느낌의 십자가/건물 아이콘
+                size: 80,
+                color: Color(0xFF1A237E),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '부천성문교회\n중등부 사역 관리',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A237E),
+                ),
+              ),
+              const SizedBox(height: 48),
+
+              // 아이디 입력칸
+              TextField(
+                controller: _idController,
+                decoration: InputDecoration(
+                  labelText: '아이디 (사전 발급)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: const Icon(Icons.person),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 비밀번호 입력칸
+              TextField(
+                controller: _pwController,
+                obscureText: true, // 비밀번호 동그라미로 숨김 처리
+                decoration: InputDecoration(
+                  labelText: '비밀번호',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: const Icon(Icons.lock),
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // [디자인 3] 로그인 버튼 (누르면 출석부로 이동)
+              ElevatedButton(
+                onPressed: () {
+                  // 화면 이동 마법의 코드! 현재 화면을 닫고 출석부 화면을 엽니다.
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AttendanceScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A237E), // 네이비 색상
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  '로그인',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// [2] 출석부 화면 UI (아까 만든 코드에 디자인만 네이비로 입힘)
+// ==========================================
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -29,16 +138,12 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  // 1. 가상의 학생 명단 (나중에 Firebase DB에서 불러올 자리입니다)
   final List<String> students = ['김민수', '이지은', '박도윤', '최서연', '정하준'];
-  
-  // 2. 출석 상태를 저장하는 공간 (이름 : 출석여부)
   final Map<String, bool> attendanceStatus = {};
 
   @override
   void initState() {
     super.initState();
-    // 처음 화면이 켜질 때 모든 학생을 '결석(false)' 상태로 세팅
     for (var student in students) {
       attendanceStatus[student] = false;
     }
@@ -46,23 +151,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 실시간으로 출석(true) 체크된 학생 수 계산
     int presentCount = attendanceStatus.values.where((status) => status).length;
 
     return Scaffold(
-      // [상단바 영역]
       appBar: AppBar(
-        title: const Text('1학년 1반 출석부', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          '1학년 1반 출석부',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFF1A237E), // 네이비 상단바
         elevation: 0,
       ),
-      
-      // [중앙 메인 영역]
       body: Column(
         children: [
-          // 날짜 및 통계 요약 박스
           Container(
             padding: const EdgeInsets.all(20.0),
             color: Colors.white,
@@ -72,28 +174,50 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('2026년 3월 29일 주일', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(
+                      '정청김 선생님, 환영합니다!',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF1A237E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '2026년 3월 29일 주일',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('오늘의 나눔: 히브리서 4장', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                    Text(
+                      '오늘의 나눔: 히브리서 4장',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: const Color(0xFFE8EAF6),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '출석 $presentCount / 총 ${students.length}명',
-                    style: TextStyle(color: Colors.blue[800], fontWeight: FontWeight.bold),
+                    '출석 $presentCount / ${students.length}명',
+                    style: const TextStyle(
+                      color: Color(0xFF1A237E),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          
-          // 학생 리스트 (스크롤 가능)
           Expanded(
             child: ListView.builder(
               itemCount: students.length,
@@ -102,7 +226,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 bool isPresent = attendanceStatus[studentName]!;
 
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     side: BorderSide(color: Colors.grey.shade300, width: 1),
@@ -111,15 +238,17 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   child: ListTile(
                     title: Text(
                       studentName,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    // 출석/결석 토글 스위치
                     trailing: Switch(
                       value: isPresent,
-                      activeColor: Colors.green,
+                      activeColor: const Color(0xFF4CAF50), // 초록색 포인트 컬러
                       onChanged: (value) {
                         setState(() {
-                          attendanceStatus[studentName] = value; // 스위치를 누르면 상태 변경
+                          attendanceStatus[studentName] = value;
                         });
                       },
                     ),
@@ -130,28 +259,29 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
         ],
       ),
-      
-      // [하단 고정 영역]
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: ElevatedButton(
             onPressed: () {
-              // 나중에 이 버튼을 누르면 Firebase로 데이터가 쏘아집니다.
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('출석 데이터가 임시 저장되었습니다!')),
               );
             },
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
-              backgroundColor: Colors.blue,
+              backgroundColor: const Color(0xFF1A237E),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
             child: const Text(
               '출석 저장하기',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
