@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "64193540272",
+    "project_id": "church-attendance-cdb07",
+    "storage_bucket": "church-attendance-cdb07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:64193540272:android:86bc95a548e3b53971cb75",
+        "android_client_info": {
+          "package_name": "com.example.church_attendance"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByTzLfyiDfNJgRpEpRCcyFmT0u9O6kUmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
