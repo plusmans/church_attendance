@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // [추가됨] 자물쇠 도구 꺼내기
+import 'firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const SungmoonApp());
 }
 
@@ -13,18 +19,17 @@ class SungmoonApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: '부천성문교회 중등부',
       theme: ThemeData(
-        // [디자인 1] 성문교회 느낌의 네이비 블루 메인 컬러 지정
         primaryColor: const Color(0xFF1A237E),
-        scaffoldBackgroundColor: const Color(0xFFFDFBF7), // 따뜻한 베이지/화이트 톤 배경
+        scaffoldBackgroundColor: const Color(0xFFFDFBF7),
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1A237E)),
       ),
-      home: const LoginScreen(), // 앱을 켜면 가장 먼저 띄울 화면을 '로그인 화면'으로 설정
+      home: const LoginScreen(),
     );
   }
 }
 
 // ==========================================
-// [1] 로그인 화면 UI
+// [1] 로그인 화면 UI (진짜 로그인 기능 탑재)
 // ==========================================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,6 +42,45 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _pwController = TextEditingController();
 
+  // [추가됨] 진짜 로그인을 시도하는 마법의 함수
+  Future<void> _tryLogin() async {
+    // 1. 사용자가 입력한 번호 가져오기 (양쪽 공백 제거)
+    String inputPhone = _idController.text.trim();
+    String inputPassword = _pwController.text.trim();
+
+    // 2. 입력값이 비어있는지 확인
+    if (inputPhone.isEmpty || inputPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('아이디(전화번호)와 비밀번호를 모두 입력해주세요.')),
+      );
+      return;
+    }
+
+    // 3. 선생님의 아이디어 적용! 뒤에 자동으로 @sungmoon.com 붙여주기
+    String finalEmail = "$inputPhone@sungmoon.com";
+
+    try {
+      // 4. 파이어베이스 서버에 문 열어달라고 요청하기!
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: finalEmail,
+        password: inputPassword,
+      );
+
+      // 5. 성공하면 출석부 화면으로 넘어가기
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AttendanceScreen()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      // 6. 비밀번호가 틀렸거나 없는 아이디일 때 에러 메시지 띄우기
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아이디 또는 비밀번호가 일치하지 않습니다.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,12 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // [디자인 2] 로고 및 타이틀 영역
-              const Icon(
-                Icons.church, // 교회 느낌의 십자가/건물 아이콘
-                size: 80,
-                color: Color(0xFF1A237E),
-              ),
+              const Icon(Icons.church, size: 80, color: Color(0xFF1A237E)),
               const SizedBox(height: 16),
               const Text(
                 '부천성문교회\n중등부 사역 관리',
@@ -65,11 +104,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // 아이디 입력칸
+              // 아이디(전화번호) 입력칸
               TextField(
                 controller: _idController,
+                keyboardType: TextInputType.number, // 숫자 키패드만 나오게 설정
                 decoration: InputDecoration(
-                  labelText: '아이디 (사전 발급)',
+                  labelText: '아이디 (전화번호 숫자만)',
+                  hintText: '예: 01011112222',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -81,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // 비밀번호 입력칸
               TextField(
                 controller: _pwController,
-                obscureText: true, // 비밀번호 동그라미로 숨김 처리
+                obscureText: true,
                 decoration: InputDecoration(
                   labelText: '비밀번호',
                   border: OutlineInputBorder(
@@ -92,19 +133,10 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
 
-              // [디자인 3] 로그인 버튼 (누르면 출석부로 이동)
               ElevatedButton(
-                onPressed: () {
-                  // 화면 이동 마법의 코드! 현재 화면을 닫고 출석부 화면을 엽니다.
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AttendanceScreen(),
-                    ),
-                  );
-                },
+                onPressed: _tryLogin, // 버튼을 누르면 위에서 만든 로그인 함수 실행!
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E), // 네이비 색상
+                  backgroundColor: const Color(0xFF1A237E),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -128,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==========================================
-// [2] 출석부 화면 UI (아까 만든 코드에 디자인만 네이비로 입힘)
+// [2] 출석부 화면 UI (진짜 Firestore 연동 완성본!)
 // ==========================================
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -138,152 +170,167 @@ class AttendanceScreen extends StatefulWidget {
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  final List<String> students = ['김민수', '이지은', '박도윤', '최서연', '정하준'];
-  final Map<String, bool> attendanceStatus = {};
+  // [1] 엑셀에서 추출한 새친구 상세 정보 매칭 사전!
+  final Map<String, Map<String, dynamic>> newFriendsExtraInfo = {
+    '이지훈': {
+      'school': '삼산중',
+      'address': '인천부평 후정도로 12 벽산블루밍',
+      'parentName': '모(이지연)',
+      'parentPhone': '010-5261-7191',
+      'notes': '이서유(중3) 동생, 할머니댁(상동)에 올때만 교회출석',
+    },
+    '이혜율': {
+      'school': '부인중',
+      'address': '부천 상동',
+      'parentName': '모',
+      'parentPhone': '010-9190-3752',
+      'notes': '전하율 학교친구',
+    },
+    '이소율': {
+      'school': '상일중',
+      'address': '',
+      'parentName': '',
+      'parentPhone': '',
+      'notes': '',
+    },
+    '이윤서': {
+      'school': '상도중',
+      'address': '사랑마을',
+      'parentName': '모',
+      'parentPhone': '010-3136-1567',
+      'notes': '사촌형제. 교회경험 없으나 자진해서 나옴',
+    },
+    '임현후': {
+      'school': '상일중',
+      'address': '소향로18',
+      'parentName': '모(홍지원)',
+      'parentPhone': '010-6366-7912',
+      'notes': '부모님 중동교회 다니심, 둘이 친구. 함께 교회 나옴',
+    },
+    '오건': {
+      'school': '상일중',
+      'address': '한양수자인',
+      'parentName': '모(김정임)',
+      'parentPhone': '010-2732-6774',
+      'notes': '부모님 성문교회 다니심',
+    },
+    '길나현': {
+      'school': '부천여중',
+      'address': '중동로19 래미안어반비스타',
+      'parentName': '모',
+      'parentPhone': '010-9367-5619',
+      'notes': '',
+    },
+    '신연호': {
+      'school': '상동중',
+      'address': '세종그랑시아 2016-108',
+      'parentName': '모(이문선)',
+      'parentPhone': '010-8555-3221',
+      'notes': '',
+    },
+    '김예나': {
+      'school': '부천여중',
+      'address': '심곡본동',
+      'parentName': '모',
+      'parentPhone': '010-6426-6828',
+      'notes': '부모님 안양(개척)교회 다니심. 지현이 따라 교회옴',
+    },
+    '최가온': {
+      'school': '상도중',
+      'address': '',
+      'parentName': '',
+      'parentPhone': '',
+      'notes': '박수빈 교사 사촌동생',
+    },
+  };
 
-  @override
-  void initState() {
-    super.initState();
-    for (var student in students) {
-      attendanceStatus[student] = false;
+  // [2] 전체 학생에게 6개의 새로운 필드를 일괄 추가하는 일괄 처리(Batch) 함수
+  Future<void> _updateAllStudentsWithNewFields() async {
+    try {
+      var db = FirebaseFirestore.instance;
+
+      // 1. 서버에 있는 학생 명단을 일단 싹 다 가져옵니다.
+      var snapshot = await db.collection('students').get();
+
+      // 2. 한 번에 포장해서 보낼 '택배 상자(batch)' 준비
+      var batch = db.batch();
+      int updateCount = 0;
+
+      // 3. 학생 1명씩 꺼내서 빈칸을 달아줍니다.
+      for (var doc in snapshot.docs) {
+        String studentName = doc.data()['name'] ?? '';
+
+        // 새친구 정보 사전에 이름이 있으면 그 데이터를, 없으면 다 빈칸으로!
+        var extraInfo = newFriendsExtraInfo[studentName];
+
+        // update()를 쓰면 기존 데이터(이름, 학년, 셀 등)는 그대로 두고 추가만 합니다.
+        batch.update(doc.reference, {
+          'address': extraInfo?['address'] ?? '', // 집주소
+          'parentName': extraInfo?['parentName'] ?? '', // 학부모이름
+          'parentPhone': extraInfo?['parentPhone'] ?? '', // 학부모 연락처
+          'school': extraInfo?['school'] ?? '', // 학교
+          'isBaptized': false, // 세례유무 (기본값: X)
+          'notes': extraInfo?['notes'] ?? '', // 특이사항
+        });
+
+        updateCount++;
+      }
+
+      // 4. 상자 통째로 전송! (0.1초 컷)
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🎉 완벽합니다! 학생 $updateCount명에게 6개 항목 일괄 추가 완료!'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('업데이트 에러: $e')));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    int presentCount = attendanceStatus.values.where((status) => status).length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          '1학년 1반 출석부',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          '학생 상세정보 일괄 업데이트',
+          style: TextStyle(color: Colors.white),
         ),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF1A237E), // 네이비 상단바
-        elevation: 0,
+        backgroundColor: Colors.brown,
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20.0),
-            color: Colors.white,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '정청김 선생님, 환영합니다!',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF1A237E),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      '2026년 3월 29일 주일',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      '오늘의 나눔: 히브리서 4장',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8EAF6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '출석 $presentCount / ${students.length}명',
-                    style: const TextStyle(
-                      color: Color(0xFF1A237E),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              '기존 DB를 지우지 않고,\n학생 전원에게 6가지 새로운 필드를 추가합니다!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18),
             ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ListView.builder(
-              itemCount: students.length,
-              itemBuilder: (context, index) {
-                String studentName = students[index];
-                bool isPresent = attendanceStatus[studentName]!;
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(color: Colors.grey.shade300, width: 1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: ListTile(
-                    title: Text(
-                      studentName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: Switch(
-                      value: isPresent,
-                      activeColor: const Color(0xFF4CAF50), // 초록색 포인트 컬러
-                      onChanged: (value) {
-                        setState(() {
-                          attendanceStatus[studentName] = value;
-                        });
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('출석 데이터가 임시 저장되었습니다!')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              backgroundColor: const Color(0xFF1A237E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              onPressed: _updateAllStudentsWithNewFields,
+              icon: const Icon(Icons.system_update_alt, color: Colors.white),
+              label: const Text(
+                '빈칸 추가 업데이트 실행!',
+                style: TextStyle(fontSize: 18, color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.brown,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 15,
+                ),
               ),
             ),
-            child: const Text(
-              '출석 저장하기',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
+          ],
         ),
       ),
     );
