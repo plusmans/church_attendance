@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_navigation.dart'; // 방금 만든 하단 탭 바 파일을 불러옵니다!
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,68 +9,67 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _idController = TextEditingController();
-  final TextEditingController _pwController = TextEditingController();
+  // 📱 전화번호 입력 컨트롤러
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  Future<void> _tryLogin() async {
-    String inputPhone = _idController.text.trim();
-    String inputPassword = _pwController.text.trim();
+  Future<void> _login() async {
+    String phoneNumber = _phoneController.text.trim();
+    String password = _passwordController.text.trim();
 
-    if (inputPhone.isEmpty || inputPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('아이디(전화번호)와 비밀번호를 모두 입력해주세요.')),
-      );
+    if (phoneNumber.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('전화번호와 비밀번호를 입력해주세요.')));
       return;
     }
 
-    String finalEmail = "$inputPhone@sungmoon.com";
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
-      // 1. 파이어베이스 Auth 로그인
+      // 💡 [핵심 수정] 입력받은 전화번호 뒤에 @sungmoon.com을 자동으로 붙입니다.
+      // 만약 사용자가 전체 이메일을 다 쳤을 경우를 대비해 체크 로직을 넣었습니다.
+      String emailFormat = phoneNumber.contains('@')
+          ? phoneNumber
+          : '$phoneNumber@sungmoon.com';
+
+      // 파이어베이스 로그인 시도
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: finalEmail,
-        password: inputPassword,
+        email: emailFormat,
+        password: password,
       );
 
-      // 2. DB에서 교사 정보 찾기
-      var teacherQuery = await FirebaseFirestore.instance
-          .collection('teachers')
-          .where('phone', isEqualTo: inputPhone)
-          .get();
-
-      if (teacherQuery.docs.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('DB에 등록된 교사 정보가 없습니다.')));
-        }
-        return;
+      // ✅ 성공 시 화면 전환은 main.dart의 StreamBuilder가 처리하므로
+      // 별도의 Navigator 코드는 작성하지 않습니다.
+    } on FirebaseAuthException catch (e) {
+      String message = '로그인에 실패했습니다.';
+      if (e.code == 'user-not-found') {
+        message = '등록되지 않은 사용자(전화번호)입니다.';
+      } else if (e.code == 'wrong-password') {
+        message = '비밀번호가 일치하지 않습니다.';
+      } else if (e.code == 'invalid-email') {
+        message = '이메일(아이디) 형식이 올바르지 않습니다.';
       }
-
-      // 3. 교사 정보 획득!
-      var teacherData = teacherQuery.docs.first.data();
-      String cell = teacherData['cell'] ?? '';
-      String role = teacherData['role'] ?? '';
-      String teacherName = teacherData['name'] ?? '';
 
       if (mounted) {
-        // 4. [핵심] 권한별 분기 없이, 무조건 'HomeNavigation'으로 이동시킵니다!
-        // (화면 쪼개기는 HomeNavigation 안에서 알아서 해줍니다)
-        Navigator.pushReplacement(
+        ScaffoldMessenger.of(
           context,
-          MaterialPageRoute(
-            builder: (context) => HomeNavigation(
-              teacherName: teacherName,
-              role: role,
-              cell: cell,
-            ),
-          ),
-        );
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('아이디 또는 비밀번호가 일치하지 않습니다.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('오류가 발생했습니다. 다시 시도해주세요.')));
+      }
+    } finally {
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+        });
     }
   }
 
@@ -81,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -89,41 +86,66 @@ class _LoginScreenState extends State<LoginScreen> {
               const Icon(Icons.church, size: 80, color: Colors.teal),
               const SizedBox(height: 20),
               const Text(
-                '부천성문교회 중등부',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                '성문교회 중등부 출석부', // 교회 이름을 넣어 보았습니다! 😊
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.teal,
+                ),
               ),
               const SizedBox(height: 40),
+
+              // 📱 전화번호 입력창
               TextField(
-                controller: _idController,
-                decoration: const InputDecoration(
-                  labelText: '아이디 (전화번호)',
-                  hintText: '예: 01012345678',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
-                ),
+                controller: _phoneController,
                 keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: '전화번호',
+                  hintText: '01012345678',
+                  prefixIcon: const Icon(Icons.phone_android_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  helperText: '숫자만 입력하시면 자동으로 로그인됩니다.',
+                ),
               ),
               const SizedBox(height: 16),
+
+              // 🔒 비밀번호 입력창
               TextField(
-                controller: _pwController,
+                controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: '비밀번호',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
+
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 55,
                 child: ElevatedButton(
-                  onPressed: _tryLogin,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: const Text(
-                    '로그인',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  onPressed: _isLoading ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          '로그인하기',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],

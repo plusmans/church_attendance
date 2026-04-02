@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class AttendanceInputScreen extends StatefulWidget {
   final String teacherCell;
@@ -33,7 +34,11 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   DateTime _getRecentSunday() {
     DateTime now = DateTime.now();
     int daysToSubtract = now.weekday % 7;
-    return now.subtract(Duration(days: daysToSubtract));
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: daysToSubtract));
   }
 
   @override
@@ -44,12 +49,16 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     _fetchStudentsAndAttendance();
   }
 
+  // 📅 날짜 선택 (한국어 설정 & 미래 날짜 차단 적용)
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: _selectedDate.isAfter(DateTime.now())
+          ? DateTime.now()
+          : _selectedDate,
       firstDate: DateTime(2025),
-      lastDate: DateTime(2030),
+      lastDate: DateTime.now(), // 👈 [핵심] 오늘 이후 날짜는 선택 불가
+      locale: const Locale('ko', 'KR'), // 👈 [핵심] 달력을 한국어(숫자 월)로 표시
       selectableDayPredicate: (DateTime date) {
         return date.weekday == DateTime.sunday;
       },
@@ -118,7 +127,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         (a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''),
       );
 
-      String formattedDate = _selectedDate.toString().substring(0, 10);
+      String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
       String paddedCell = '${_selectedCell.padLeft(2, '0')}셀';
       String docId = '${paddedCell}_$formattedDate';
 
@@ -162,32 +171,23 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       setState(() {
         _isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('데이터 로드 실패: $e')));
-      }
     }
   }
 
-  // 📝 [생일 및 부모님 정보 그룹화 추가!]
   void _showAddStudentDialog() {
     TextEditingController nameController = TextEditingController();
-    TextEditingController birthController =
-        TextEditingController(); // 💡 생일 컨트롤러
+    TextEditingController birthController = TextEditingController();
     TextEditingController phoneController = TextEditingController();
     TextEditingController schoolController = TextEditingController();
     TextEditingController addressController = TextEditingController();
     TextEditingController memoController = TextEditingController();
-
-    // 💡 부모님 정보 컨트롤러
     TextEditingController parentNameController = TextEditingController();
     TextEditingController parentRoleController = TextEditingController();
     TextEditingController parentPhoneController = TextEditingController();
 
     String gender = '남자';
     String grade = '중1';
-    String parentChurchAttendance = '출석(본교회)'; // 💡 부모님 출석 기본값
+    String parentChurchAttendance = '출석(본교회)';
 
     showDialog(
       context: context,
@@ -216,8 +216,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         ),
                       ),
                       const SizedBox(height: 15),
-
-                      // 1. 이름 (필수)
                       TextField(
                         controller: nameController,
                         decoration: const InputDecoration(
@@ -227,8 +225,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // 2. 성별과 학년
                       Row(
                         children: [
                           Expanded(
@@ -275,8 +271,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // 3. 생일과 연락처
                       Row(
                         children: [
                           Expanded(
@@ -306,8 +300,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // 4. 학교 / 주소 / 비고
                       TextField(
                         controller: schoolController,
                         decoration: const InputDecoration(
@@ -321,7 +313,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         controller: addressController,
                         decoration: const InputDecoration(
                           labelText: '주소 (선택)',
-                          hintText: '동/호수까지 상세히',
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -332,14 +323,11 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         maxLines: 2,
                         decoration: const InputDecoration(
                           labelText: '인도자 및 비고 (선택)',
-                          hintText: '예: 홍길동 인도, 알러지 있음 등',
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // 👨‍👩‍👧 5. 부모님 정보 박스 (별도로 예쁘게 묶어줍니다!)
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -417,7 +405,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                                     controller: parentRoleController,
                                     decoration: const InputDecoration(
                                       labelText: '직분',
-                                      hintText: '예: 집사',
                                       border: OutlineInputBorder(),
                                       isDense: true,
                                       filled: true,
@@ -433,7 +420,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                               keyboardType: TextInputType.phone,
                               decoration: const InputDecoration(
                                 labelText: '부모님 연락처',
-                                hintText: '010-0000-0000',
                                 border: OutlineInputBorder(),
                                 isDense: true,
                                 filled: true,
@@ -450,75 +436,44 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                  child: const Text('취소'),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     String newName = nameController.text.trim();
-                    if (newName.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('이름을 입력해주세요!')),
-                      );
-                      return;
-                    }
-
+                    if (newName.isEmpty) return;
                     Navigator.pop(context);
                     setState(() {
                       _isLoading = true;
                     });
-
                     try {
-                      // 💡 생일과 부모님 정보까지 통째로 저장됩니다!
                       await FirebaseFirestore.instance
                           .collection('students')
                           .add({
                             'name': newName,
                             'gender': gender,
                             'grade': grade,
-                            'birth': birthController.text.trim(), // 생일
+                            'birth': birthController.text.trim(),
                             'phone': phoneController.text.trim(),
                             'school': schoolController.text.trim(),
                             'address': addressController.text.trim(),
                             'memo': memoController.text.trim(),
-                            // 부모님 데이터 모음
                             'parentName': parentNameController.text.trim(),
                             'parentChurchAttendance': parentChurchAttendance,
                             'parentRole': parentRoleController.text.trim(),
                             'parentPhone': parentPhoneController.text.trim(),
-                            // 기본 시스템 데이터
                             'cell': _selectedCell,
                             'role': '새친구',
                             'registeredAt': FieldValue.serverTimestamp(),
                           });
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('새친구 상세 정보가 저장되었습니다! 🥳'),
-                          ),
-                        );
-                      }
-
                       _fetchStudentsAndAttendance();
                     } catch (e) {
                       setState(() {
                         _isLoading = false;
                       });
-                      if (mounted) {
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text('등록 실패: $e')));
-                      }
                     }
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                  child: const Text(
-                    '저장하기',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: const Text('저장하기'),
                 ),
               ],
             );
@@ -528,47 +483,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     );
   }
 
-  void _onSaveButtonPressed() {
-    if (_selectedCell != widget.teacherCell) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('대타 출석 체크 확인'),
-            ],
-          ),
-          content: Text(
-            '선생님의 담당 반(${widget.teacherCell}셀)이 아닙니다.\n\n현재 화면의 [$_selectedCell셀] 출석을\n대신 저장하시겠습니까?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _executeSave();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-              child: const Text(
-                '네, 대신 저장합니다',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      _executeSave();
-    }
-  }
-
-  Future<void> _executeSave() async {
-    String formattedDate = _selectedDate.toString().substring(0, 10);
+  void _onSaveButtonPressed() async {
+    String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
     String paddedCell = '${_selectedCell.padLeft(2, '0')}셀';
     String docId = '${paddedCell}_$formattedDate';
 
@@ -585,18 +501,15 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         'records': finalDataToSave,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('🎉 출석이 성공적으로 저장되었습니다!')));
-      }
+        ).showSnackBar(const SnackBar(content: Text('🎉 출석 저장 완료!')));
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
-      }
     }
   }
 
@@ -608,10 +521,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-            ),
+            decoration: const BoxDecoration(color: Colors.white),
             child: Column(
               children: [
                 Row(
@@ -622,7 +532,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
                     TextButton.icon(
@@ -631,28 +540,18 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         Icons.calendar_month,
                         color: Colors.teal,
                       ),
+                      // 💡 [수정] 날짜를 숫자로 보기 좋게 표시
                       label: Text(
-                        _selectedDate.toString().substring(0, 10),
+                        DateFormat('yyyy. MM. dd').format(_selectedDate),
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.teal,
                         ),
                       ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        backgroundColor: Colors.teal.shade50,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -661,7 +560,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
                     Row(
@@ -669,39 +567,26 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         IconButton(
                           onPressed: _showAddStudentDialog,
                           icon: const Icon(
-                            Icons.person_add_alt_1,
-                            color: Colors.deepOrange,
-                          ),
-                          tooltip: '새친구 등록',
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.orange.shade50,
+                            Icons.person_add,
+                            color: Colors.orange,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         DropdownButton<String>(
                           value: _selectedCell,
-                          underline: Container(height: 2, color: Colors.teal),
-                          items: List.generate(10, (index) {
-                            String cellNum = '${index + 1}';
-                            String displayCell = '${cellNum.padLeft(2, '0')}셀';
-                            return DropdownMenuItem(
-                              value: cellNum,
-                              child: Text(
-                                displayCell,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                          items: List.generate(10, (i) => '${i + 1}')
+                              .map(
+                                (val) => DropdownMenuItem(
+                                  value: val,
+                                  child: Text('${val.padLeft(2, '0')}셀'),
                                 ),
-                              ),
-                            );
-                          }),
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
+                              )
+                              .toList(),
+                          onChanged: (val) {
+                            if (val != null)
                               setState(() {
-                                _selectedCell = newValue;
+                                _selectedCell = val;
+                                _fetchStudentsAndAttendance();
                               });
-                              _fetchStudentsAndAttendance();
-                            }
                           },
                         ),
                       ],
@@ -716,221 +601,101 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                 ? const Center(
                     child: CircularProgressIndicator(color: Colors.teal),
                   )
-                : _studentsList.isEmpty
-                ? const Center(child: Text('해당 반에 학생이 없습니다.'))
                 : ListView.builder(
                     itemCount: _studentsList.length,
                     itemBuilder: (context, index) {
                       var student = _studentsList[index];
                       String name = student['name'];
-                      String role = student['role'];
                       bool isDisabled = student['isBeforeRegistration'] == true;
-
-                      var studentData = _attendanceData[name]!;
-                      String status = studentData['status'];
-                      String reason = studentData['reason'];
+                      var data = _attendanceData[name]!;
 
                       return Opacity(
                         opacity: isDisabled ? 0.4 : 1.0,
                         child: Card(
                           margin: const EdgeInsets.symmetric(
                             horizontal: 12,
-                            vertical: 8,
-                          ),
-                          elevation: isDisabled ? 0 : 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            vertical: 6,
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
                                     Text(
                                       name,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
-                                        decoration: isDisabled
-                                            ? TextDecoration.lineThrough
-                                            : null,
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    if (role == '새친구')
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.shade100,
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '새친구',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.deepOrange,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
                                     const Spacer(),
-                                    Text(
-                                      student['school'] ?? '',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 13,
+                                    if (isDisabled)
+                                      const Text(
+                                        '🚫 등록 전 날짜',
+                                        style: TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 16),
-
-                                if (isDisabled)
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      '🚫 이 날짜 이후에 등록된 학생입니다.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  )
-                                else ...[
+                                if (!isDisabled) ...[
+                                  const SizedBox(height: 10),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: ElevatedButton(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: status == '출석'
+                                            backgroundColor:
+                                                data['status'] == '출석'
                                                 ? Colors.teal
                                                 : Colors.grey.shade200,
-                                            foregroundColor: status == '출석'
-                                                ? Colors.white
-                                                : Colors.black87,
-                                            elevation: status == '출석' ? 2 : 0,
                                           ),
                                           onPressed: () => setState(
                                             () =>
                                                 _attendanceData[name]!['status'] =
                                                     '출석',
                                           ),
-                                          child: const Text(
-                                            '🟢 출석',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                          child: const Text('출석'),
                                         ),
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: ElevatedButton(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: status == '결석'
+                                            backgroundColor:
+                                                data['status'] == '결석'
                                                 ? Colors.red.shade400
                                                 : Colors.grey.shade200,
-                                            foregroundColor: status == '결석'
-                                                ? Colors.white
-                                                : Colors.black87,
-                                            elevation: status == '결석' ? 2 : 0,
                                           ),
                                           onPressed: () => setState(
                                             () =>
                                                 _attendanceData[name]!['status'] =
                                                     '결석',
                                           ),
-                                          child: const Text(
-                                            '🔴 결석',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                          child: const Text('결석'),
                                         ),
                                       ),
                                     ],
                                   ),
-
-                                  if (status == '결석') ...[
-                                    const SizedBox(height: 12),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.shade50,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          Row(
-                                            children: [
-                                              const Text(
-                                                '결석 사유: ',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.red,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Expanded(
-                                                child: DropdownButton<String>(
-                                                  isExpanded: true,
-                                                  value: reason,
-                                                  items: _absenceReasons.map((
-                                                    String val,
-                                                  ) {
-                                                    return DropdownMenuItem(
-                                                      value: val,
-                                                      child: Text(val),
-                                                    );
-                                                  }).toList(),
-                                                  onChanged: (String? newVal) {
-                                                    if (newVal != null) {
-                                                      setState(
-                                                        () =>
-                                                            _attendanceData[name]!['reason'] =
-                                                                newVal,
-                                                      );
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          if (reason == '기타') ...[
-                                            const SizedBox(height: 8),
-                                            TextFormField(
-                                              initialValue:
-                                                  studentData['customReason'],
-                                              decoration: const InputDecoration(
-                                                hintText: '결석 사유를 직접 입력해주세요',
-                                                border: OutlineInputBorder(),
-                                                isDense: true,
-                                                fillColor: Colors.white,
-                                                filled: true,
-                                              ),
-                                              onChanged: (val) {
-                                                _attendanceData[name]!['customReason'] =
-                                                    val;
-                                              },
+                                  if (data['status'] == '결석')
+                                    DropdownButton<String>(
+                                      isExpanded: true,
+                                      value: data['reason'],
+                                      items: _absenceReasons
+                                          .map(
+                                            (r) => DropdownMenuItem(
+                                              value: r,
+                                              child: Text(r),
                                             ),
-                                          ],
-                                        ],
+                                          )
+                                          .toList(),
+                                      onChanged: (val) => setState(
+                                        () => _attendanceData[name]!['reason'] =
+                                            val!,
                                       ),
                                     ),
-                                  ],
                                 ],
                               ],
                             ),
@@ -945,11 +710,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _onSaveButtonPressed,
         backgroundColor: Colors.teal,
+        label: const Text('출석 저장하기', style: TextStyle(color: Colors.white)),
         icon: const Icon(Icons.save, color: Colors.white),
-        label: const Text(
-          '출석 저장하기',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
       ),
     );
   }

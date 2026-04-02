@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'attendance/attendance_input.dart';
+import 'attendance/attendance_status.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
@@ -20,62 +21,35 @@ class HomeNavigation extends StatefulWidget {
 
 class _HomeNavigationState extends State<HomeNavigation> {
   int _selectedIndex = 0;
+  String? _selectedCell; // 💡 선택된 셀을 저장할 변수
+
+  @override
+  void initState() {
+    super.initState();
+    // 초기 진입 설정
+    if (widget.role == '회계') {
+      _selectedIndex = 1;
+    } else if (widget.role == '부장' ||
+        widget.role == '강도사' ||
+        widget.role.contains('담당')) {
+      _selectedIndex = 0; // 통계/입력 탭
+    }
+    _selectedCell = widget.cell; // 기본값은 내 셀
+  }
+
+  // 💡 [핵심] 이 함수가 호출되면 화면을 강제로 '입력창'으로 바꿉니다.
+  void _jumpToInput(String cellName) {
+    setState(() {
+      _selectedCell = cellName;
+      // 탭을 이동시키는 게 아니라, '화면 구성' 자체를 다시 하도록 유도합니다.
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    bool isAccountant = widget.role == '회계';
-    bool isCellTeacher =
-        !(widget.role.contains('담당') ||
-            widget.role == '부장' ||
-            widget.role == '강도사' ||
-            widget.role == '회계');
-
-    final List<Widget> screens = [
-      isCellTeacher
-          ? AttendanceInputScreen(teacherCell: widget.cell)
-          : const Center(
-              child: Text(
-                '전체 출석 현황 (개발 예정 📊)',
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
-
-      isAccountant
-          ? const Center(
-              child: Text(
-                '헌금 입력 화면 (개발 예정 💰)',
-                style: TextStyle(fontSize: 20),
-              ),
-            )
-          : const Center(
-              child: Text(
-                '헌금 현황 조회 (개발 예정 🔍)',
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
-
-      isCellTeacher
-          ? const Center(
-              child: Text(
-                '우리반 기도제목 입력 (개발 예정 🙏)',
-                style: TextStyle(fontSize: 20),
-              ),
-            )
-          : const Center(
-              child: Text(
-                '전체 중보기도 현황 (개발 예정 📖)',
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
-
-      const Center(
-        child: Text('학생 관리 및 명부 (개발 예정 🧑‍🎓)', style: TextStyle(fontSize: 20)),
-      ),
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 75, // 💡 두 줄이 예쁘게 들어가도록 높이를 살짝 키웠습니다!
+        toolbarHeight: 75,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -89,12 +63,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
             ),
             const SizedBox(height: 4),
             const Text(
-              '오늘도 사랑으로 아이들을 섬겨주셔서 감사합니다 💖',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w400,
-                color: Colors.white70,
-              ), // 살짝 연한 색으로 세련되게!
+              '성문교회 중등부 사역을 응원합니다 💖',
+              style: TextStyle(fontSize: 13, color: Colors.white70),
             ),
           ],
         ),
@@ -103,14 +73,12 @@ class _HomeNavigationState extends State<HomeNavigation> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            tooltip: '로그아웃',
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
-            },
+            onPressed: () => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
-      body: screens[_selectedIndex],
+      // 💡 IndexedStack 대신 직접 조건문을 써서 화면을 교체합니다 (가장 확실한 방법)
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
@@ -119,10 +87,13 @@ class _HomeNavigationState extends State<HomeNavigation> {
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
+            // 탭을 바꿀 때 선택된 셀 정보를 초기화(내 셀로 복귀) 하거나
+            // 통계 화면으로 돌아가게 설정합니다.
+            if (index == 0) _selectedCell = null;
           });
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.check_circle), label: '출석'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: '출석'),
           BottomNavigationBarItem(
             icon: Icon(Icons.monetization_on),
             label: '헌금',
@@ -132,5 +103,29 @@ class _HomeNavigationState extends State<HomeNavigation> {
         ],
       ),
     );
+  }
+
+  // 💡 화면을 그려주는 핵심 로직
+  Widget _buildBody() {
+    if (_selectedIndex == 0) {
+      // 💡 선택된 셀이 있다면 '입력창'을, 없다면 '통계창'을 보여줍니다.
+      if (_selectedCell != null) {
+        return AttendanceInputScreen(teacherCell: _selectedCell!);
+      } else {
+        return AttendanceStatusScreen(onCellTap: _jumpToInput);
+      }
+    }
+
+    // 나머지 탭들
+    switch (_selectedIndex) {
+      case 1:
+        return const Center(child: Text('헌금 현황 (준비 중)'));
+      case 2:
+        return const Center(child: Text('중보기도 (준비 중)'));
+      case 3:
+        return const Center(child: Text('학생 관리 (준비 중)'));
+      default:
+        return const Center(child: Text('화면을 찾을 수 없습니다.'));
+    }
   }
 }
