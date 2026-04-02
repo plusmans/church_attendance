@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'attendance/attendance_input.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
@@ -22,25 +23,16 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔐 권한 확인 로직! (일반 교사인가? 회계인가?)
     bool isAccountant = widget.role == '회계';
-    // 담당, 부장, 강도사, 회계가 아니면 무조건 일반 셀 담당 교사로 봅니다.
     bool isCellTeacher =
         !(widget.role.contains('담당') ||
             widget.role == '부장' ||
             widget.role == '강도사' ||
             widget.role == '회계');
 
-    // 📱 하단 탭을 눌렀을 때 보여줄 3개의 화면을 권한에 맞게 장착합니다.
     final List<Widget> screens = [
-      // 1. 출석 탭: 일반 교사면 [출석 체크], 관리자/회계면 [출석 현황]
       isCellTeacher
-          ? const Center(
-              child: Text(
-                '출석 체크 화면 (개발 예정 🚀)',
-                style: TextStyle(fontSize: 20),
-              ),
-            )
+          ? AttendanceInputScreen(teacherCell: widget.cell)
           : const Center(
               child: Text(
                 '전체 출석 현황 (개발 예정 📊)',
@@ -48,7 +40,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
               ),
             ),
 
-      // 2. 헌금 탭: 회계면 [헌금 입력], 나머지는 [헌금 현황]
       isAccountant
           ? const Center(
               child: Text(
@@ -63,7 +54,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
               ),
             ),
 
-      // 3. 기도 탭: 일반 교사면 [기도제목 입력], 관리자면 [기도제목 현황]
       isCellTeacher
           ? const Center(
               child: Text(
@@ -77,32 +67,58 @@ class _HomeNavigationState extends State<HomeNavigation> {
                 style: TextStyle(fontSize: 20),
               ),
             ),
+
+      const Center(
+        child: Text('학생 관리 및 명부 (개발 예정 🧑‍🎓)', style: TextStyle(fontSize: 20)),
+      ),
     ];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${widget.teacherName} ${widget.role}님',
-          style: const TextStyle(fontWeight: FontWeight.bold),
+        toolbarHeight: 75, // 💡 두 줄이 예쁘게 들어가도록 높이를 살짝 키웠습니다!
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.teacherName} ${widget.role}님, 축복합니다! ✨',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '오늘도 사랑으로 아이들을 섬겨주셔서 감사합니다 💖',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Colors.white70,
+              ), // 살짝 연한 색으로 세련되게!
+            ),
+          ],
         ),
         backgroundColor: Colors.teal,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: '로그아웃',
             onPressed: () {
-              // 로그아웃 버튼 (나중에 로그인 화면으로 돌아가는 코드 추가 예정)
               FirebaseAuth.instance.signOut();
             },
           ),
         ],
       ),
-      body: screens[_selectedIndex], // 사용자가 누른 탭의 화면을 보여줌
+      body: screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.teal,
+        unselectedItemColor: Colors.grey,
         onTap: (index) {
           setState(() {
-            _selectedIndex = index; // 탭을 누르면 화면 전환!
+            _selectedIndex = index;
           });
         },
         items: const [
@@ -111,7 +127,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
             icon: Icon(Icons.monetization_on),
             label: '헌금',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '중보기도'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '기도'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: '학생관리'),
         ],
       ),
     );
