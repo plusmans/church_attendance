@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'attendance_status.dart';
 
 class AttendanceInputScreen extends StatefulWidget {
   final String teacherCell;
@@ -26,23 +27,13 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   Map<String, TextEditingController> _customReasonControllers = {};
 
   final List<String> _absenceReasons = [
-    '연락x',
-    '장기결석',
-    '늦잠',
-    '질병',
-    '여행',
-    '친척방문',
-    '타교회',
-    '본당예배',
-    '학원',
-    '기타',
+    '연락x', '장기결석', '늦잠', '질병', '여행', '친척방문', '타교회', '본당예배', '학원', '기타',
   ];
 
   @override
   void initState() {
     super.initState();
     _targetDate = widget.selectedDate ?? _getRecentSunday();
-    // ✅ '담당'일 경우 1로, 그 외엔 받은 값 그대로 유지
     _currentCell = widget.teacherCell == '담당' ? '1' : widget.teacherCell;
     _loadData();
   }
@@ -50,11 +41,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   DateTime _getRecentSunday() {
     DateTime now = DateTime.now();
     int daysToSubtract = now.weekday % 7;
-    return DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: daysToSubtract));
+    return DateTime(now.year, now.month, now.day).subtract(Duration(days: daysToSubtract));
   }
 
   Future<void> _loadData() async {
@@ -62,44 +49,25 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     setState(() => _isLoading = true);
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
+      String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : (int.tryParse(_currentCell) ?? _currentCell).toString();
+      String docId = _currentCell == 'teachers' ? 'teachers_$dateStr' : '${cleanCellNum}셀_$dateStr';
 
-      // ✅ [핵심] Firestore 문서 ID가 '1셀_날짜' 형식이므로 0을 제거한 숫자만 사용
-      String cleanCellNum = _currentCell == 'teachers'
-          ? 'teachers'
-          : (int.tryParse(_currentCell) ?? _currentCell).toString();
-
-      String docId = _currentCell == 'teachers'
-          ? 'teachers_$dateStr'
-          : '${cleanCellNum}셀_$dateStr';
-
-      debugPrint("🔎 [로드 요청] 문서 ID: $docId");
-
-      var doc = await FirebaseFirestore.instance
-          .collection('attendance')
-          .doc(docId)
-          .get();
+      var doc = await FirebaseFirestore.instance.collection('attendance').doc(docId).get();
 
       if (doc.exists) {
-        Map<String, dynamic> records = Map<String, dynamic>.from(
-          doc.data()?['records'] ?? {},
-        );
+        Map<String, dynamic> records = Map<String, dynamic>.from(doc.data()?['records'] ?? {});
         var sortedNames = records.keys.toList()..sort();
 
-        // 기존 컨트롤러 정리
         _customReasonControllers.values.forEach((c) => c.dispose());
         _customReasonControllers.clear();
 
         for (var name in sortedNames) {
-          _customReasonControllers[name] = TextEditingController(
-            text: records[name]['customReason'] ?? '',
-          );
+          _customReasonControllers[name] = TextEditingController(text: records[name]['customReason'] ?? '');
         }
 
         setState(() {
           _memberNames = sortedNames;
-          _attendanceData = records.map(
-            (key, value) => MapEntry(key, Map<String, dynamic>.from(value)),
-          );
+          _attendanceData = records.map((key, value) => MapEntry(key, Map<String, dynamic>.from(value)));
         });
       } else {
         setState(() {
@@ -114,53 +82,170 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     }
   }
 
+  // ✅ [복원] 새친구 상세 등록 다이얼로그
+  void _addNewMember() {
+    final nameController = TextEditingController();
+    final birthController = TextEditingController();
+    final phoneController = TextEditingController();
+    final schoolController = TextEditingController();
+    final addressController = TextEditingController();
+    final memoController = TextEditingController();
+    final parentNameController = TextEditingController();
+    final parentRoleController = TextEditingController();
+    final parentPhoneController = TextEditingController();
+
+    String gender = '남자';
+    String grade = '중1';
+    String parentChurchAttendance = '출석(본교회)';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text('🎉 새친구 상세 등록', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _SectionTitle(title: "📍 학생 기본 정보", color: Colors.teal),
+                      const SizedBox(height: 10),
+                      TextField(controller: nameController, decoration: const InputDecoration(labelText: '이름 (필수)', border: OutlineInputBorder(), isDense: true)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDropdown('성별', gender, ['남자', '여자'], (val) => setStateDialog(() => gender = val!))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _buildDropdown('학년', grade, ['중1', '중2', '중3'], (val) => setStateDialog(() => grade = val!))),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: TextField(controller: birthController, decoration: const InputDecoration(labelText: '생일 (예: 0514)', border: OutlineInputBorder(), isDense: true))),
+                          const SizedBox(width: 10),
+                          Expanded(child: TextField(controller: phoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '연락처', border: OutlineInputBorder(), isDense: true))),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(controller: schoolController, decoration: const InputDecoration(labelText: '학교', border: OutlineInputBorder(), isDense: true)),
+                      const SizedBox(height: 10),
+                      TextField(controller: addressController, decoration: const InputDecoration(labelText: '주소', border: OutlineInputBorder(), isDense: true)),
+                      const SizedBox(height: 10),
+                      TextField(controller: memoController, maxLines: 2, decoration: const InputDecoration(labelText: '인도자 및 비고', border: OutlineInputBorder(), isDense: true)),
+                      const SizedBox(height: 20),
+                      const _SectionTitle(title: "👨‍👩‍👧 부모님 정보", color: Colors.blueGrey),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.blueGrey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.blueGrey.shade100)),
+                        child: Column(
+                          children: [
+                            TextField(controller: parentNameController, decoration: const InputDecoration(labelText: '부모님 성함', border: OutlineInputBorder(), isDense: true, filled: true, fillColor: Colors.white)),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(flex: 3, child: _buildDropdown('교회 출석', parentChurchAttendance, ['출석(본교회)', '출석(타교회)', '미출석', '모름'], (val) => setStateDialog(() => parentChurchAttendance = val!))),
+                                const SizedBox(width: 8),
+                                Expanded(flex: 2, child: TextField(controller: parentRoleController, decoration: const InputDecoration(labelText: '직분', border: OutlineInputBorder(), isDense: true, filled: true, fillColor: Colors.white))),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(controller: parentPhoneController, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: '부모님 연락처', border: OutlineInputBorder(), isDense: true, filled: true, fillColor: Colors.white)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+                ElevatedButton(
+                  onPressed: () {
+                    String newName = nameController.text.trim();
+                    if (newName.isEmpty) return;
+                    setState(() {
+                      if (!_memberNames.contains(newName)) {
+                        _memberNames.add(newName);
+                        _memberNames.sort();
+                        _attendanceData[newName] = {
+                          'status': '출석', 'reason': '연락x', 'customReason': '',
+                          'gender': gender, 'grade': grade, 'birth': birthController.text.trim(),
+                          'phone': phoneController.text.trim(), 'school': schoolController.text.trim(),
+                          'address': addressController.text.trim(), 'memo': memoController.text.trim(),
+                          'parentName': parentNameController.text.trim(), 'parentChurchAttendance': parentChurchAttendance,
+                          'parentRole': parentRoleController.text.trim(), 'parentPhone': parentPhoneController.text.trim(),
+                          'role': '새친구',
+                        };
+                        _customReasonControllers[newName] = TextEditingController();
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                  child: const Text('리스트에 추가'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+    return DropdownButtonFormField<String>(
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), isDense: true),
+      value: value,
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
   Future<void> _saveAttendance() async {
     if (_memberNames.isEmpty) return;
     setState(() => _isLoading = true);
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
+      String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : (int.tryParse(_currentCell) ?? _currentCell).toString();
+      String docId = _currentCell == 'teachers' ? 'teachers_$dateStr' : '${cleanCellNum}셀_$dateStr';
 
-      // ✅ [핵심] 저장할 때도 0이 없는 '1셀_날짜' 형식 유지
-      String cleanCellNum = _currentCell == 'teachers'
-          ? 'teachers'
-          : (int.tryParse(_currentCell) ?? _currentCell).toString();
-
-      String docId = _currentCell == 'teachers'
-          ? 'teachers_$dateStr'
-          : '${cleanCellNum}셀_$dateStr';
-
-      debugPrint("🔎 [저장하기] 문서 ID: $docId");
-
-      // 텍스트 필드 값 최종 반영
       for (var name in _memberNames) {
-        _attendanceData[name]!['customReason'] =
-            _customReasonControllers[name]?.text ?? '';
+        if (_attendanceData.containsKey(name)) {
+          _attendanceData[name]!['customReason'] = _customReasonControllers[name]?.text ?? '';
+        }
       }
 
-      // ✅ [중요 수정] 실제 데이터 필드를 채워서 저장합니다.
       await FirebaseFirestore.instance.collection('attendance').doc(docId).set({
-        'cell': cleanCellNum,
-        'date': dateStr,
-        'records': _attendanceData,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'cell': cleanCellNum, 'date': dateStr, 'records': _attendanceData, 'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // attendance_input.dart의 _saveAttendance 내
       if (mounted) {
-        // 스낵바를 띄우기 전 미리 화면을 닫는 것도 방법입니다.
-        Navigator.pop(context, true);
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text("💾 출석 정보가 저장되었습니다.")),
+  );
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("💾 출석 정보가 저장되었습니다.")));
-      }
+  // 현재 화면이 Push로 들어온 화면인지 확인하고 pop
+  if (Navigator.of(context).canPop()) {
+    Navigator.pop(context, true); // true를 던져서 통계 페이지 새로고침 유도
+  } 
+}
+/*
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("💾 출석 정보가 저장되었습니다.")));
+        if (Navigator.of(context).canPop()) {
+          Navigator.pop(context, true);
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AttendanceStatusScreen()));
+        }
+      } */
     } catch (e) {
       debugPrint("❌ 저장 에러: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("저장 실패: $e")));
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -169,20 +254,12 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   @override
   Widget build(BuildContext context) {
     bool isTeacherMode = _currentCell == 'teachers';
-    // ✅ 입력 화면용 로그 (에러 없음)
-    debugPrint(
-      "🎨 [입력화면 그리기] 명단 개수: ${_memberNames.length}, 로딩상태: $_isLoading",
-    );
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: Text(
-          isTeacherMode ? "교사 출석 입력" : "학생 출석 입력",
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
+        title: Text(isTeacherMode ? "교사 출석 입력" : "학생 출석 입력", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: isTeacherMode ? Colors.orange : Colors.teal,
         foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: Column(
         children: [
@@ -191,92 +268,58 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _memberNames.isEmpty
-                ? const Center(child: Text("해당 날짜에 등록된 명단이 없습니다."))
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                    itemCount: _memberNames.length,
-                    itemBuilder: (context, index) {
-                      String name = _memberNames[index];
-                      var data = _attendanceData[name]!;
-                      bool isPresent = data['status'] == '출석';
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Row(
+                    ? const Center(child: Text("해당 날짜에 등록된 명단이 없습니다."))
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+                        itemCount: _memberNames.length,
+                        itemBuilder: (context, index) {
+                          String name = _memberNames[index];
+                          var data = _attendanceData[name]!;
+                          bool isPresent = data['status'] == '출석';
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
                                 children: [
-                                  Text(
-                                    '${index + 1}. $name',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text('${index + 1}. $name', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                                      const Spacer(),
+                                      _statusButton(name, '출석', isPresent, Colors.teal),
+                                      const SizedBox(width: 8),
+                                      _statusButton(name, '결석', !isPresent, Colors.red.shade400),
+                                    ],
                                   ),
-                                  const Spacer(),
-                                  _statusButton(
-                                    name,
-                                    '출석',
-                                    isPresent,
-                                    Colors.teal,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  _statusButton(
-                                    name,
-                                    '결석',
-                                    !isPresent,
-                                    Colors.red.shade400,
-                                  ),
+                                  if (!isPresent) ...[
+                                    const SizedBox(height: 12),
+                                    _buildReasonDropdown(name, data),
+                                    if (data['reason'] == '기타') ...[
+                                      const SizedBox(height: 8),
+                                      TextField(controller: _customReasonControllers[name], decoration: const InputDecoration(hintText: "상세 사유 입력", isDense: true, border: OutlineInputBorder(), filled: true, fillColor: Colors.white), style: const TextStyle(fontSize: 14)),
+                                    ],
+                                  ],
                                 ],
                               ),
-                              if (!isPresent) ...[
-                                const SizedBox(height: 12),
-                                _buildReasonDropdown(name, data),
-                                if (data['reason'] == '기타') ...[
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: _customReasonControllers[name],
-                                    decoration: const InputDecoration(
-                                      hintText: "상세 사유 입력",
-                                      isDense: true,
-                                      border: OutlineInputBorder(),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                ],
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: 55,
-        child: FloatingActionButton.extended(
-          onPressed: _isLoading ? null : _saveAttendance,
-          backgroundColor: isTeacherMode ? Colors.orange : Colors.teal,
-          label: const Text(
-            "출석 정보 저장하기",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            FloatingActionButton(heroTag: "addBtn", onPressed: _addNewMember, backgroundColor: Colors.white, child: Icon(Icons.person_add, color: isTeacherMode ? Colors.orange : Colors.teal)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FloatingActionButton.extended(heroTag: "saveBtn", onPressed: _isLoading ? null : _saveAttendance, backgroundColor: isTeacherMode ? Colors.orange : Colors.teal, label: const Text("출석 정보 저장하기", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)), icon: const Icon(Icons.save, color: Colors.white)),
             ),
-          ),
-          icon: const Icon(Icons.save, color: Colors.white),
+          ],
         ),
       ),
     );
@@ -291,54 +334,21 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '📅 기준일:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: () => _selectDate(context),
-                child: Text(
-                  DateFormat('yyyy. MM. dd').format(_targetDate),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.teal,
-                  ),
-                ),
-              ),
+              const Text('📅 기준일:', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextButton(onPressed: () => _selectDate(context), child: Text(DateFormat('yyyy. MM. dd').format(_targetDate), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal))),
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '✅ 선택 반:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text('✅ 선택 반:', style: TextStyle(fontWeight: FontWeight.bold)),
               DropdownButton<String>(
                 value: _currentCell,
                 items: [
-                  const DropdownMenuItem(
-                    value: 'teachers',
-                    child: Text('교사전체'),
-                  ),
-                  ...List.generate(10, (i) => '${i + 1}')
-                      .map(
-                        (val) => DropdownMenuItem(
-                          value: val,
-                          child: Text('${val.padLeft(2, '0')}셀'), // 화면 표시만 01셀로
-                        ),
-                      )
-                      .toList(),
+                  const DropdownMenuItem(value: 'teachers', child: Text('교사전체')),
+                  ...List.generate(10, (i) => '${i + 1}').map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀'))).toList(),
                 ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _currentCell = val;
-                      _loadData();
-                    });
-                  }
-                },
+                onChanged: (val) { if (val != null) setState(() { _currentCell = val; _loadData(); }); },
               ),
             ],
           ),
@@ -350,64 +360,25 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   Widget _buildReasonDropdown(String name, Map<String, dynamic> data) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
+      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
-          value: _absenceReasons.contains(data['reason'])
-              ? data['reason']
-              : '기타',
-          items: _absenceReasons
-              .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-              .toList(),
-          onChanged: (val) {
-            setState(() {
-              _attendanceData[name]!['reason'] = val;
-              if (val != '기타') _customReasonControllers[name]?.clear();
-            });
-          },
+          value: _absenceReasons.contains(data['reason']) ? data['reason'] : '기타',
+          items: _absenceReasons.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+          onChanged: (val) { setState(() { _attendanceData[name]!['reason'] = val; if (val != '기타') _customReasonControllers[name]?.clear(); }); },
         ),
       ),
     );
   }
 
-  Widget _statusButton(
-    String name,
-    String label,
-    bool isSelected,
-    Color activeColor,
-  ) {
+  Widget _statusButton(String name, String label, bool isSelected, Color activeColor) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _attendanceData[name]!['status'] = label;
-          if (label == '출석') {
-            _attendanceData[name]!['reason'] = '연락x';
-            _customReasonControllers[name]?.clear();
-          }
-        });
-      },
+      onTap: () { setState(() { _attendanceData[name]!['status'] = label; if (label == '출석') { _attendanceData[name]!['reason'] = '연락x'; _customReasonControllers[name]?.clear(); } }); },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? activeColor : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey.shade600,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
+        decoration: BoxDecoration(color: isSelected ? activeColor : Colors.grey.shade100, borderRadius: BorderRadius.circular(20), border: Border.all(color: isSelected ? activeColor : Colors.grey.shade300)),
+        child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 13)),
       ),
     );
   }
@@ -419,18 +390,22 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       firstDate: DateTime(2026, 1, 1),
       lastDate: DateTime.now(),
       locale: const Locale('ko', 'KR'),
+      selectableDayPredicate: (DateTime day) => day.weekday == DateTime.sunday, // 일요일만
     );
-    if (picked != null && picked != _targetDate) {
-      setState(() {
-        _targetDate = picked;
-        _loadData();
-      });
-    }
+    if (picked != null && picked != _targetDate) { setState(() { _targetDate = picked; _loadData(); }); }
   }
 
   @override
-  void dispose() {
-    _customReasonControllers.values.forEach((c) => c.dispose());
-    super.dispose();
+  void dispose() { _customReasonControllers.values.forEach((c) => c.dispose()); super.dispose(); }
+}
+
+// 헬퍼 위젯: 섹션 타이틀
+class _SectionTitle extends StatelessWidget {
+  final String title;
+  final Color color;
+  const _SectionTitle({required this.title, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [Container(width: 4, height: 16, color: color), const SizedBox(width: 8), Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color))]);
   }
 }

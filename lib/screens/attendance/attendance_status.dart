@@ -92,13 +92,19 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     }
   }
 
-  // ✅ [수정] 로그인 직후 경로 이탈 방지 로직
+ // ✅ [수정] 메뉴바 유지를 위한 내비게이션 로직
   Future<void> _handleCellTap(String actualId) async {
     debugPrint("🚀 [수정 시작] 선택된 셀 ID: $actualId");
 
-    // 1. rootNavigator: true를 사용하여 탭바나 중첩된 내비게이터에 상관없이
-    // 확실하게 입력 화면을 전체 화면으로 띄웁니다.
-    final result = await Navigator.of(context, rootNavigator: true).push(
+    // 상황 1: 만약 부모(HomeNavigation)에서 넘겨준 탭 전환 함수가 있다면 그것을 사용 (가장 확실함)
+    if (widget.onCellTap != null) {
+      widget.onCellTap!(actualId);
+      return; 
+    }
+
+    // 상황 2: 일반적인 Push 이동 (메뉴바 유지를 위해 context를 명확히 사용)
+    final result = await Navigator.push(
+      context, // Navigator.of(context) 대신 context를 직접 전달
       MaterialPageRoute(
         builder: (context) => AttendanceInputScreen(
           teacherCell: actualId,
@@ -109,16 +115,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
     debugPrint("🚩 [복귀 완료] 결과값: $result");
 
-    // 2. 결과값이 true이거나, 혹시 null이라도 화면이 비어있다면 무조건 다시 불러오기
     if (result == true || _cellStats.isEmpty) {
-      debugPrint("🔄 [새로고침 실행] 데이터를 서버에서 다시 가져옵니다.");
-
-      // 화면이 유효한지 확인 후 데이터 갱신
       if (!mounted) return;
       _fetchStats();
     }
   }
-
   void _processWeeklyData(QuerySnapshot snapshot) {
     Map<String, Map<String, dynamic>> tempStats = {};
     int sP = 0;
