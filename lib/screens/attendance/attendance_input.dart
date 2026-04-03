@@ -4,20 +4,26 @@ import 'package:intl/intl.dart';
 
 class AttendanceInputScreen extends StatefulWidget {
   final String teacherCell;
+  final DateTime? selectedDate;
 
-  const AttendanceInputScreen({super.key, required this.teacherCell});
+  const AttendanceInputScreen({
+    super.key,
+    required this.teacherCell,
+    this.selectedDate,
+  });
 
   @override
   State<AttendanceInputScreen> createState() => _AttendanceInputScreenState();
 }
 
 class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
-  late String _selectedCell;
-  late DateTime _selectedDate;
+  bool _isLoading = true;
+  late DateTime _targetDate;
+  late String _currentCell;
 
-  List<Map<String, dynamic>> _studentsList = [];
   Map<String, Map<String, dynamic>> _attendanceData = {};
-  bool _isLoading = false;
+  List<String> _memberNames = [];
+  Map<String, TextEditingController> _customReasonControllers = {};
 
   final List<String> _absenceReasons = [
     '연락x',
@@ -32,6 +38,15 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     '기타',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _targetDate = widget.selectedDate ?? _getRecentSunday();
+    // ✅ '담당'일 경우 1로, 그 외엔 받은 값 그대로 유지
+    _currentCell = widget.teacherCell == '담당' ? '1' : widget.teacherCell;
+    _loadData();
+  }
+
   DateTime _getRecentSunday() {
     DateTime now = DateTime.now();
     int daysToSubtract = now.weekday % 7;
@@ -42,664 +57,202 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     ).subtract(Duration(days: daysToSubtract));
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _selectedCell = widget.teacherCell == '담당' ? '1' : widget.teacherCell;
-    _selectedDate = _getRecentSunday();
-    _fetchStudentsAndAttendance();
-  }
-
-  // 📅 날짜 선택 (한국어 설정 & 미래 날짜 차단 적용)
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate.isAfter(DateTime.now())
-          ? DateTime.now()
-          : _selectedDate,
-      firstDate: DateTime(2025),
-      lastDate: DateTime.now(),
-      locale: const Locale('ko', 'KR'),
-      selectableDayPredicate: (DateTime date) {
-        return date.weekday == DateTime.sunday;
-      },
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.teal,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      _fetchStudentsAndAttendance();
-    }
-  }
-
-  Future<void> _fetchStudentsAndAttendance() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
     try {
-      var studentSnapshot = await FirebaseFirestore.instance
-          .collection('students')
-          .where('cell', isEqualTo: _selectedCell)
-          .get();
+      String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
 
-      List<Map<String, dynamic>> loadedStudents = [];
+      // ✅ [핵심] Firestore 문서 ID가 '1셀_날짜' 형식이므로 0을 제거한 숫자만 사용
+      String cleanCellNum = _currentCell == 'teachers'
+          ? 'teachers'
+          : (int.tryParse(_currentCell) ?? _currentCell).toString();
 
-      for (var doc in studentSnapshot.docs) {
-        var data = doc.data();
-        bool isBeforeRegistration = false;
+      String docId = _currentCell == 'teachers'
+          ? 'teachers_$dateStr'
+          : '${cleanCellNum}셀_$dateStr';
 
-        if (data.containsKey('registeredAt') && data['registeredAt'] != null) {
-          DateTime regDate = (data['registeredAt'] as Timestamp).toDate();
-          DateTime pureRegDate = DateTime(
-            regDate.year,
-            regDate.month,
-            regDate.day,
-          );
-          DateTime pureSelectedDate = DateTime(
-            _selectedDate.year,
-            _selectedDate.month,
-            _selectedDate.day,
-          );
+      debugPrint("🔎 [로드 요청] 문서 ID: $docId");
 
-          if (pureRegDate.isAfter(pureSelectedDate)) {
-            isBeforeRegistration = true;
-          }
-        }
-
-        data['isBeforeRegistration'] = isBeforeRegistration;
-        loadedStudents.add(data);
-      }
-
-      loadedStudents.sort(
-        (a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''),
-      );
-
-      String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      String paddedCell = '${_selectedCell.padLeft(2, '0')}셀';
-      String docId = '${paddedCell}_$formattedDate';
-
-      var attendanceDoc = await FirebaseFirestore.instance
+      var doc = await FirebaseFirestore.instance
           .collection('attendance')
           .doc(docId)
           .get();
-      Map<String, Map<String, dynamic>> loadedData = {};
 
-      if (attendanceDoc.exists &&
-          attendanceDoc.data()!.containsKey('records')) {
-        Map<String, dynamic> existingRecords = attendanceDoc.data()!['records'];
-        for (var student in loadedStudents) {
-          String name = student['name'];
-          if (existingRecords.containsKey(name)) {
-            loadedData[name] = Map<String, dynamic>.from(existingRecords[name]);
-          } else {
-            loadedData[name] = {
-              'status': '출석',
-              'reason': '연락x',
-              'customReason': '',
-            };
-          }
+      if (doc.exists) {
+        Map<String, dynamic> records = Map<String, dynamic>.from(
+          doc.data()?['records'] ?? {},
+        );
+        var sortedNames = records.keys.toList()..sort();
+
+        // 기존 컨트롤러 정리
+        _customReasonControllers.values.forEach((c) => c.dispose());
+        _customReasonControllers.clear();
+
+        for (var name in sortedNames) {
+          _customReasonControllers[name] = TextEditingController(
+            text: records[name]['customReason'] ?? '',
+          );
         }
+
+        setState(() {
+          _memberNames = sortedNames;
+          _attendanceData = records.map(
+            (key, value) => MapEntry(key, Map<String, dynamic>.from(value)),
+          );
+        });
       } else {
-        for (var student in loadedStudents) {
-          loadedData[student['name']] = {
-            'status': '출석',
-            'reason': '연락x',
-            'customReason': '',
-          };
-        }
+        setState(() {
+          _memberNames = [];
+          _attendanceData = {};
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ 로드 에러: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveAttendance() async {
+    if (_memberNames.isEmpty) return;
+    setState(() => _isLoading = true);
+    try {
+      String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
+
+      // ✅ [핵심] 저장할 때도 0이 없는 '1셀_날짜' 형식 유지
+      String cleanCellNum = _currentCell == 'teachers'
+          ? 'teachers'
+          : (int.tryParse(_currentCell) ?? _currentCell).toString();
+
+      String docId = _currentCell == 'teachers'
+          ? 'teachers_$dateStr'
+          : '${cleanCellNum}셀_$dateStr';
+
+      debugPrint("🔎 [저장하기] 문서 ID: $docId");
+
+      // 텍스트 필드 값 최종 반영
+      for (var name in _memberNames) {
+        _attendanceData[name]!['customReason'] =
+            _customReasonControllers[name]?.text ?? '';
       }
 
-      setState(() {
-        _studentsList = loadedStudents;
-        _attendanceData = loadedData;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _showAddStudentDialog() {
-    TextEditingController nameController = TextEditingController();
-    TextEditingController birthController = TextEditingController();
-    TextEditingController phoneController = TextEditingController();
-    TextEditingController schoolController = TextEditingController();
-    TextEditingController addressController = TextEditingController();
-    TextEditingController memoController = TextEditingController();
-    TextEditingController parentNameController = TextEditingController();
-    TextEditingController parentRoleController = TextEditingController();
-    TextEditingController parentPhoneController = TextEditingController();
-
-    String gender = '남자';
-    String grade = '중1';
-    String parentChurchAttendance = '출석(본교회)';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: const Text(
-                '🎉 새친구 상세 등록',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.teal,
-                ),
-              ),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '[$_selectedCell셀]에 새로운 친구의 상세 정보를 입력합니다.',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      TextField(
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: '이름 (필수)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                labelText: '성별',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              value: gender,
-                              items: ['남자', '여자']
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text(e),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (val) =>
-                                  setStateDialog(() => gender = val!),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                labelText: '학년',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              value: grade,
-                              items: ['중1', '중2', '중3']
-                                  .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e,
-                                      child: Text(e),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (val) =>
-                                  setStateDialog(() => grade = val!),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: birthController,
-                              decoration: const InputDecoration(
-                                labelText: '생일 (선택)',
-                                hintText: '예: 0514',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: phoneController,
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: '연락처 (선택)',
-                                hintText: '010-...',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: schoolController,
-                        decoration: const InputDecoration(
-                          labelText: '학교 (선택)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: addressController,
-                        decoration: const InputDecoration(
-                          labelText: '주소 (선택)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: memoController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          labelText: '인도자 및 비고 (선택)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blueGrey.shade50,
-                          border: Border.all(color: Colors.blueGrey.shade200),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.family_restroom,
-                                  size: 18,
-                                  color: Colors.blueGrey,
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  '부모님 정보',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blueGrey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: parentNameController,
-                              decoration: const InputDecoration(
-                                labelText: '부모님 성함',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: DropdownButtonFormField<String>(
-                                    decoration: const InputDecoration(
-                                      labelText: '교회 출석',
-                                      border: OutlineInputBorder(),
-                                      isDense: true,
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
-                                    value: parentChurchAttendance,
-                                    items: ['출석(본교회)', '출석(타교회)', '미출석', '모름']
-                                        .map(
-                                          (e) => DropdownMenuItem(
-                                            value: e,
-                                            child: Text(
-                                              e,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (val) => setStateDialog(
-                                      () => parentChurchAttendance = val!,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  flex: 2,
-                                  child: TextField(
-                                    controller: parentRoleController,
-                                    decoration: const InputDecoration(
-                                      labelText: '직분',
-                                      border: OutlineInputBorder(),
-                                      isDense: true,
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: parentPhoneController,
-                              keyboardType: TextInputType.phone,
-                              decoration: const InputDecoration(
-                                labelText: '부모님 연락처',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('취소'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    String newName = nameController.text.trim();
-                    if (newName.isEmpty) return;
-                    Navigator.pop(context);
-                    setState(() {
-                      _isLoading = true;
-                    });
-                    try {
-                      await FirebaseFirestore.instance
-                          .collection('students')
-                          .add({
-                            'name': newName,
-                            'gender': gender,
-                            'grade': grade,
-                            'birth': birthController.text.trim(),
-                            'phone': phoneController.text.trim(),
-                            'school': schoolController.text.trim(),
-                            'address': addressController.text.trim(),
-                            'memo': memoController.text.trim(),
-                            'parentName': parentNameController.text.trim(),
-                            'parentChurchAttendance': parentChurchAttendance,
-                            'parentRole': parentRoleController.text.trim(),
-                            'parentPhone': parentPhoneController.text.trim(),
-                            'cell': _selectedCell,
-                            'role': '새친구',
-                            'registeredAt': FieldValue.serverTimestamp(),
-                          });
-                      _fetchStudentsAndAttendance();
-                    } catch (e) {
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    }
-                  },
-                  child: const Text('저장하기'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _onSaveButtonPressed() async {
-    String formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    String paddedCell = '${_selectedCell.padLeft(2, '0')}셀';
-    String docId = '${paddedCell}_$formattedDate';
-
-    Map<String, Map<String, dynamic>> finalDataToSave = {};
-    for (var student in _studentsList) {
-      if (student['isBeforeRegistration'] == true) continue;
-      finalDataToSave[student['name']] = _attendanceData[student['name']]!;
-    }
-
-    try {
+      // ✅ [중요 수정] 실제 데이터 필드를 채워서 저장합니다.
       await FirebaseFirestore.instance.collection('attendance').doc(docId).set({
-        'cell': _selectedCell,
-        'date': formattedDate,
-        'records': finalDataToSave,
+        'cell': cleanCellNum,
+        'date': dateStr,
+        'records': _attendanceData,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
-      if (mounted)
+      }, SetOptions(merge: true));
+
+      // attendance_input.dart의 _saveAttendance 내
+      if (mounted) {
+        // 스낵바를 띄우기 전 미리 화면을 닫는 것도 방법입니다.
+        Navigator.pop(context, true);
+
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('🎉 출석 저장 완료!')));
+        ).showSnackBar(const SnackBar(content: Text("💾 출석 정보가 저장되었습니다.")));
+      }
     } catch (e) {
-      if (mounted)
+      debugPrint("❌ 저장 에러: $e");
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+        ).showSnackBar(SnackBar(content: Text("저장 실패: $e")));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    bool isTeacherMode = _currentCell == 'teachers';
+    // ✅ 입력 화면용 로그 (에러 없음)
+    debugPrint(
+      "🎨 [입력화면 그리기] 명단 개수: ${_memberNames.length}, 로딩상태: $_isLoading",
+    );
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
+      appBar: AppBar(
+        title: Text(
+          isTeacherMode ? "교사 출석 입력" : "학생 출석 입력",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        backgroundColor: isTeacherMode ? Colors.orange : Colors.teal,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            decoration: const BoxDecoration(color: Colors.white),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      '📅 출석 기준일:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _selectDate(context),
-                      icon: const Icon(
-                        Icons.calendar_month,
-                        color: Colors.teal,
-                      ),
-                      label: Text(
-                        DateFormat('yyyy. MM. dd').format(_selectedDate),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      '✅ 출석 체크 반:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: _showAddStudentDialog,
-                          icon: const Icon(
-                            Icons.person_add,
-                            color: Colors.orange,
-                          ),
-                        ),
-                        DropdownButton<String>(
-                          value: _selectedCell,
-                          items: List.generate(10, (i) => '${i + 1}')
-                              .map(
-                                (val) => DropdownMenuItem(
-                                  value: val,
-                                  child: Text('${val.padLeft(2, '0')}셀'),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (val) {
-                            if (val != null)
-                              setState(() {
-                                _selectedCell = val;
-                                _fetchStudentsAndAttendance();
-                              });
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          _buildTopSelector(),
           Expanded(
             child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.teal),
-                  )
+                ? const Center(child: CircularProgressIndicator())
+                : _memberNames.isEmpty
+                ? const Center(child: Text("해당 날짜에 등록된 명단이 없습니다."))
                 : ListView.builder(
-                    itemCount: _studentsList.length,
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                    itemCount: _memberNames.length,
                     itemBuilder: (context, index) {
-                      var student = _studentsList[index];
-                      String name = student['name'];
-                      bool isDisabled = student['isBeforeRegistration'] == true;
+                      String name = _memberNames[index];
                       var data = _attendanceData[name]!;
+                      bool isPresent = data['status'] == '출석';
 
-                      return Opacity(
-                        opacity: isDisabled ? 0.4 : 1.0,
-                        child: Card(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    // ✅ [수정 완료] 이름 앞에 순번(index + 1) 추가
-                                    Text(
-                                      '${index + 1}. $name',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    '${index + 1}. $name',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    const Spacer(),
-                                    if (isDisabled)
-                                      const Text(
-                                        '🚫 등록 전 날짜',
-                                        style: TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                if (!isDisabled) ...[
-                                  const SizedBox(height: 10),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                data['status'] == '출석'
-                                                ? Colors.teal
-                                                : Colors.grey.shade200,
-                                          ),
-                                          onPressed: () => setState(
-                                            () =>
-                                                _attendanceData[name]!['status'] =
-                                                    '출석',
-                                          ),
-                                          child: const Text('출석'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                data['status'] == '결석'
-                                                ? Colors.red.shade400
-                                                : Colors.grey.shade200,
-                                          ),
-                                          onPressed: () => setState(
-                                            () =>
-                                                _attendanceData[name]!['status'] =
-                                                    '결석',
-                                          ),
-                                          child: const Text('결석'),
-                                        ),
-                                      ),
-                                    ],
                                   ),
-                                  if (data['status'] == '결석')
-                                    DropdownButton<String>(
-                                      isExpanded: true,
-                                      value: data['reason'],
-                                      items: _absenceReasons
-                                          .map(
-                                            (r) => DropdownMenuItem(
-                                              value: r,
-                                              child: Text(r),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (val) => setState(
-                                        () => _attendanceData[name]!['reason'] =
-                                            val!,
-                                      ),
+                                  const Spacer(),
+                                  _statusButton(
+                                    name,
+                                    '출석',
+                                    isPresent,
+                                    Colors.teal,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _statusButton(
+                                    name,
+                                    '결석',
+                                    !isPresent,
+                                    Colors.red.shade400,
+                                  ),
+                                ],
+                              ),
+                              if (!isPresent) ...[
+                                const SizedBox(height: 12),
+                                _buildReasonDropdown(name, data),
+                                if (data['reason'] == '기타') ...[
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: _customReasonControllers[name],
+                                    decoration: const InputDecoration(
+                                      hintText: "상세 사유 입력",
+                                      isDense: true,
+                                      border: OutlineInputBorder(),
+                                      filled: true,
+                                      fillColor: Colors.white,
                                     ),
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
                                 ],
                               ],
-                            ),
+                            ],
                           ),
                         ),
                       );
@@ -708,12 +261,176 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _onSaveButtonPressed,
-        backgroundColor: Colors.teal,
-        label: const Text('출석 저장하기', style: TextStyle(color: Colors.white)),
-        icon: const Icon(Icons.save, color: Colors.white),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: 55,
+        child: FloatingActionButton.extended(
+          onPressed: _isLoading ? null : _saveAttendance,
+          backgroundColor: isTeacherMode ? Colors.orange : Colors.teal,
+          label: const Text(
+            "출석 정보 저장하기",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          icon: const Icon(Icons.save, color: Colors.white),
+        ),
       ),
     );
+  }
+
+  Widget _buildTopSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      decoration: const BoxDecoration(color: Colors.white),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '📅 기준일:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: () => _selectDate(context),
+                child: Text(
+                  DateFormat('yyyy. MM. dd').format(_targetDate),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '✅ 선택 반:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              DropdownButton<String>(
+                value: _currentCell,
+                items: [
+                  const DropdownMenuItem(
+                    value: 'teachers',
+                    child: Text('교사전체'),
+                  ),
+                  ...List.generate(10, (i) => '${i + 1}')
+                      .map(
+                        (val) => DropdownMenuItem(
+                          value: val,
+                          child: Text('${val.padLeft(2, '0')}셀'), // 화면 표시만 01셀로
+                        ),
+                      )
+                      .toList(),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _currentCell = val;
+                      _loadData();
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReasonDropdown(String name, Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: _absenceReasons.contains(data['reason'])
+              ? data['reason']
+              : '기타',
+          items: _absenceReasons
+              .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+              .toList(),
+          onChanged: (val) {
+            setState(() {
+              _attendanceData[name]!['reason'] = val;
+              if (val != '기타') _customReasonControllers[name]?.clear();
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _statusButton(
+    String name,
+    String label,
+    bool isSelected,
+    Color activeColor,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _attendanceData[name]!['status'] = label;
+          if (label == '출석') {
+            _attendanceData[name]!['reason'] = '연락x';
+            _customReasonControllers[name]?.clear();
+          }
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade300,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey.shade600,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _targetDate,
+      firstDate: DateTime(2026, 1, 1),
+      lastDate: DateTime.now(),
+      locale: const Locale('ko', 'KR'),
+    );
+    if (picked != null && picked != _targetDate) {
+      setState(() {
+        _targetDate = picked;
+        _loadData();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _customReasonControllers.values.forEach((c) => c.dispose());
+    super.dispose();
   }
 }

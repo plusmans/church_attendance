@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'attendance_input.dart';
 
 class AttendanceStatusScreen extends StatefulWidget {
   final Function(String)? onCellTap;
@@ -12,14 +13,16 @@ class AttendanceStatusScreen extends StatefulWidget {
 
 class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   DateTime _selectedDate = _getRecentSunday();
-  String _viewType = '주별'; // '주별', '월별', '누적'
+  String _viewType = '주별';
   bool _isLoading = false;
 
-  int _totalPresent = 0;
-  int _totalStudents = 0;
+  int _studentPresent = 0;
+  int _studentTotal = 0;
+  int _teacherPresent = 0;
+  int _teacherTotal = 0;
 
-  Map<String, Map<String, dynamic>> _cellStats = {}; // 주별 상세 (명단 포함)
-  List<Map<String, dynamic>> _summaryList = []; // 월별/누적용 리스트
+  Map<String, Map<String, dynamic>> _cellStats = {};
+  List<Map<String, dynamic>> _summaryList = [];
 
   static DateTime _getRecentSunday() {
     DateTime now = DateTime.now();
@@ -37,24 +40,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     _fetchStats();
   }
 
-  // 📡 데이터 가져오기 통합 함수
+  // ✅ 데이터를 불러오는 핵심 함수
   Future<void> _fetchStats() async {
-    setState(() {
-      _isLoading = true;
-    });
-    try {
-      // 1. 재적 학생 수 파악
-      var studentSnapshot = await FirebaseFirestore.instance
-          .collection('students')
-          .get();
-      _totalStudents = studentSnapshot.docs.length;
-      Map<String, int> studentCountByCell = {};
-      for (var doc in studentSnapshot.docs) {
-        String cell = doc.data()['cell']?.toString() ?? '미지정';
-        studentCountByCell[cell] = (studentCountByCell[cell] ?? 0) + 1;
-      }
+    if (!mounted) return;
+    setState(() => _isLoading = true);
 
-      // 2. 날짜 범위 설정
+    try {
       DateTime startDate;
       DateTime endDate = DateTime.now();
 
@@ -62,139 +53,201 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         startDate = DateTime(_selectedDate.year, _selectedDate.month, 1);
         endDate = DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
       } else if (_viewType == '누적') {
-        startDate = DateTime(_selectedDate.year, 1, 1); // 올해 1월 1일부터
+        startDate = DateTime(_selectedDate.year, 1, 1);
       } else {
         startDate = _selectedDate;
         endDate = _selectedDate;
       }
 
-      // 3. 파이어베이스 쿼리
+      String startStr = DateFormat('yyyy-MM-dd').format(startDate);
+      String endStr = DateFormat('yyyy-MM-dd').format(endDate);
+
       var snapshot = await FirebaseFirestore.instance
           .collection('attendance')
-          .where(
-            'date',
-            isGreaterThanOrEqualTo: DateFormat('yyyy-MM-dd').format(startDate),
-          )
-          .where(
-            'date',
-            isLessThanOrEqualTo: DateFormat('yyyy-MM-dd').format(endDate),
-          )
-          .get();
+          .where('date', isGreaterThanOrEqualTo: startStr)
+          .where('date', isLessThanOrEqualTo: endStr)
+          .get(const GetOptions(source: Source.serverAndCache)); // 서버 데이터를 우선시
+
+      if (snapshot.docs.isEmpty) {
+        setState(() {
+          _cellStats = {};
+          _studentPresent = 0;
+          _studentTotal = 0;
+          _teacherPresent = 0;
+          _teacherTotal = 0;
+          _isLoading = false;
+        });
+        return;
+      }
 
       if (_viewType == '주별') {
-        _processWeeklyData(snapshot, studentCountByCell);
+        _processWeeklyData(snapshot);
       } else {
         _processGroupedData(snapshot);
       }
-
-      setState(() {
-        _isLoading = false;
-      });
     } catch (e) {
-      debugPrint("Error fetching stats: $e");
-      setState(() {
-        _isLoading = false;
-      });
+      debugPrint("❌ 데이터 로드 에러: $e");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // 💡 [주별] 데이터 처리 (타입 에러 해결 버전)
-  void _processWeeklyData(
-    QuerySnapshot snapshot,
-    Map<String, int> studentCountByCell,
-  ) {
+  // ✅ [수정] 로그인 직후 경로 이탈 방지 로직
+  Future<void> _handleCellTap(String actualId) async {
+    debugPrint("🚀 [수정 시작] 선택된 셀 ID: $actualId");
+
+    // 1. rootNavigator: true를 사용하여 탭바나 중첩된 내비게이터에 상관없이
+    // 확실하게 입력 화면을 전체 화면으로 띄웁니다.
+    final result = await Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (context) => AttendanceInputScreen(
+          teacherCell: actualId,
+          selectedDate: _selectedDate,
+        ),
+      ),
+    );
+
+    debugPrint("🚩 [복귀 완료] 결과값: $result");
+
+    // 2. 결과값이 true이거나, 혹시 null이라도 화면이 비어있다면 무조건 다시 불러오기
+    if (result == true || _cellStats.isEmpty) {
+      debugPrint("🔄 [새로고침 실행] 데이터를 서버에서 다시 가져옵니다.");
+
+      // 화면이 유효한지 확인 후 데이터 갱신
+      if (!mounted) return;
+      _fetchStats();
+    }
+  }
+
+  void _processWeeklyData(QuerySnapshot snapshot) {
     Map<String, Map<String, dynamic>> tempStats = {};
-    int tempPresentTotal = 0;
+    int sP = 0;
+    int sT = 0;
+    int tP = 0;
+    int tT = 0;
 
     for (var doc in snapshot.docs) {
       var data = doc.data() as Map<String, dynamic>;
-      String cell = data['cell']?.toString() ?? '0';
-
-      // ✅ LinkedMap 에러 방지를 위해 .from() 사용
-      Map<String, dynamic> records = data['records'] != null
-          ? Map<String, dynamic>.from(data['records'])
-          : {};
+      String docId = doc.id;
+      Map<String, dynamic> records = Map<String, dynamic>.from(
+        data['records'] ?? {},
+      );
 
       int present = 0;
       records.forEach((name, info) {
-        if (info is Map) {
-          var infoMap = Map<String, dynamic>.from(info);
-          if (infoMap['status']?.toString() == '출석') present++;
-        }
+        if (info is Map && info['status'] == '출석') present++;
       });
 
-      tempPresentTotal += present;
-      tempStats[cell] = {
-        'total': studentCountByCell[cell] ?? 0,
-        'present': present,
-        'records': records,
-      };
+      if (docId.startsWith('teachers')) {
+        tP += present;
+        tT += records.length;
+        tempStats['교사'] = {
+          'id': 'teachers',
+          'total': records.length,
+          'present': present,
+          'records': records,
+        };
+      } else {
+        String rawId = docId.split('셀')[0];
+        String cleanId = (int.tryParse(rawId) ?? 0).toString();
+
+        sP += present;
+        sT += records.length;
+        tempStats[cleanId] = {
+          'id': cleanId,
+          'total': records.length,
+          'present': present,
+          'records': records,
+        };
+      }
     }
 
-    // 데이터가 없는 셀도 표시
-    studentCountByCell.forEach((cell, count) {
-      if (!tempStats.containsKey(cell)) {
-        tempStats[cell] = {'total': count, 'present': 0, 'records': {}};
-      }
-    });
-
-    _cellStats = Map.fromEntries(
-      tempStats.entries.toList()..sort(
-        (a, b) =>
-            (int.tryParse(a.key) ?? 99).compareTo(int.tryParse(b.key) ?? 99),
-      ),
-    );
-    _totalPresent = tempPresentTotal;
+    if (mounted) {
+      setState(() {
+        _cellStats = Map.fromEntries(
+          tempStats.entries.toList()..sort((a, b) {
+            if (a.key == '교사') return -1;
+            if (b.key == '교사') return 1;
+            return (int.tryParse(a.key) ?? 99).compareTo(
+              int.tryParse(b.key) ?? 99,
+            );
+          }),
+        );
+        _studentPresent = sP;
+        _studentTotal = sT;
+        _teacherPresent = tP;
+        _teacherTotal = tT;
+      });
+    }
   }
 
-  // 💡 [월별/누적] 데이터 처리 (타입 에러 해결 버전)
   void _processGroupedData(QuerySnapshot snapshot) {
-    Map<String, int> dateSummary = {};
+    Map<String, Map<String, int>> dateSummary = {};
     for (var doc in snapshot.docs) {
       var data = doc.data() as Map<String, dynamic>;
       String date = data['date'];
-
-      Map<String, dynamic> records = data['records'] != null
-          ? Map<String, dynamic>.from(data['records'])
-          : {};
-
+      String docId = doc.id;
+      Map<String, dynamic> records = Map<String, dynamic>.from(
+        data['records'] ?? {},
+      );
       int present = 0;
       records.forEach((name, info) {
-        if (info is Map) {
-          var infoMap = Map<String, dynamic>.from(info);
-          if (infoMap['status']?.toString() == '출석') present++;
-        }
+        if (info is Map && info['status'] == '출석') present++;
       });
-      dateSummary[date] = (dateSummary[date] ?? 0) + present;
+      if (!dateSummary.containsKey(date)) {
+        dateSummary[date] = {'sP': 0, 'sT': 0, 'tP': 0, 'tT': 0};
+      }
+      if (docId.startsWith('teachers')) {
+        dateSummary[date]!['tP'] = (dateSummary[date]!['tP'] ?? 0) + present;
+        dateSummary[date]!['tT'] =
+            (dateSummary[date]!['tT'] ?? 0) + records.length;
+      } else {
+        dateSummary[date]!['sP'] = (dateSummary[date]!['sP'] ?? 0) + present;
+        dateSummary[date]!['sT'] =
+            (dateSummary[date]!['sT'] ?? 0) + records.length;
+      }
     }
-
     _summaryList = dateSummary.entries
         .map(
-          (e) => {'date': e.key, 'present': e.value, 'total': _totalStudents},
+          (e) => {
+            'date': e.key,
+            'sP': e.value['sP'],
+            'sT': e.value['sT'],
+            'tP': e.value['tP'],
+            'tT': e.value['tT'],
+          },
         )
         .toList();
     _summaryList.sort((a, b) => b['date'].compareTo(a['date']));
-
-    if (dateSummary.isNotEmpty) {
-      _totalPresent =
-          (dateSummary.values.reduce((a, b) => a + b) / dateSummary.length)
+    if (_summaryList.isNotEmpty) {
+      _studentPresent =
+          (_summaryList.map((e) => e['sP'] as int).reduce((a, b) => a + b) /
+                  _summaryList.length)
               .round();
-    } else {
-      _totalPresent = 0;
+      _studentTotal =
+          (_summaryList.map((e) => e['sT'] as int).reduce((a, b) => a + b) /
+                  _summaryList.length)
+              .round();
+      _teacherPresent =
+          (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) /
+                  _summaryList.length)
+              .round();
+      _teacherTotal =
+          (_summaryList.map((e) => e['tT'] as int).reduce((a, b) => a + b) /
+                  _summaryList.length)
+              .round();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    double rate = _totalStudents > 0
-        ? (_totalPresent / _totalStudents) * 100
-        : 0;
+    debugPrint("🎨 [빌드] 통계 리스트 개수: ${_cellStats.length}");
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          _buildSummaryHeader(rate),
+          _buildSummaryHeader(),
           _buildViewToggle(),
           Expanded(
             child: _isLoading
@@ -208,17 +261,20 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  Widget _buildSummaryHeader(double rate) {
-    String titleText = "";
-    if (_viewType == '주별')
-      titleText = DateFormat('yyyy년 MM월 dd일').format(_selectedDate);
-    else if (_viewType == '월별')
-      titleText = DateFormat('yyyy년 MM월').format(_selectedDate);
-    else
-      titleText = "2026년 누적 현황";
-
+  Widget _buildSummaryHeader() {
+    double sRate = _studentTotal > 0
+        ? (_studentPresent / _studentTotal) * 100
+        : 0;
+    double tRate = _teacherTotal > 0
+        ? (_teacherPresent / _teacherTotal) * 100
+        : 0;
+    String titleText = _viewType == '주별'
+        ? DateFormat('yyyy년 MM월 dd일').format(_selectedDate)
+        : _viewType == '월별'
+        ? DateFormat('yyyy년 MM월').format(_selectedDate)
+        : "${_selectedDate.year}년 누적 현황";
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 15),
       child: Column(
         children: [
           InkWell(
@@ -229,7 +285,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                 Text(
                   titleText,
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.teal,
                   ),
@@ -239,27 +295,61 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            decoration: BoxDecoration(
-              color: Colors.teal.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _statItem(
-                  _viewType == '주별' ? "출석 인원" : "평균 출석",
-                  "$_totalPresent명",
-                  Colors.teal,
-                ),
-                _statItem("총 재적", "$_totalStudents명", Colors.black87),
-                _statItem("출석률", "${rate.toStringAsFixed(1)}%", Colors.orange),
-              ],
-            ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              _buildSummaryCard(
+                "학생",
+                _studentPresent,
+                _studentTotal,
+                sRate,
+                Colors.blue,
+              ),
+              const SizedBox(width: 10),
+              _buildSummaryCard(
+                "교사",
+                _teacherPresent,
+                _teacherTotal,
+                tRate,
+                Colors.orange,
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(String title, int p, int t, double r, Color c) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: c.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: c,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "$p / $t",
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              "${r.toStringAsFixed(1)}%",
+              style: TextStyle(color: c, fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -268,38 +358,34 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       child: Row(
-        children: ['주별', '월별', '누적']
-            .map(
-              (type) => Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _viewType = type;
-                      _fetchStats();
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _viewType == type
-                          ? Colors.teal
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      type,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: _viewType == type ? Colors.white : Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+        children: ['주별', '월별', '누적'].map((type) {
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _viewType = type;
+                  _fetchStats();
+                });
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _viewType == type ? Colors.teal : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  type,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _viewType == type ? Colors.white : Colors.grey,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-            )
-            .toList(),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -309,73 +395,59 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       padding: const EdgeInsets.all(16),
       itemCount: _cellStats.length,
       itemBuilder: (context, index) {
-        String cell = _cellStats.keys.elementAt(index);
-        var stat = _cellStats[cell]!;
-        Map<String, dynamic> records = Map<String, dynamic>.from(
-          stat['records'],
-        );
-
-        List<String> presentNames = [];
-        records.forEach((name, info) {
-          if (info is Map && info['status'] == '출석') presentNames.add(name);
-        });
+        String displayKey = _cellStats.keys.elementAt(index);
+        var stat = _cellStats[displayKey]!;
+        String actualId = stat['id'];
+        bool isT = displayKey == '교사';
 
         return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade200),
+            side: BorderSide(
+              color: isT ? Colors.orange.shade200 : Colors.grey.shade200,
+            ),
           ),
           child: ExpansionTile(
-            shape: const Border(),
-            title: Text(
-              '$cell셀',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            title: InkWell(
+              // ✅ [수정] 텍스트 클릭 시 핸들러 호출
+              onTap: () => _handleCellTap(actualId),
+              child: Text(
+                isT ? '👨‍🏫 교사 전체' : '$displayKey셀',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isT ? Colors.orange.shade900 : Colors.black87,
+                  decoration: TextDecoration.underline,
+                  decorationColor: isT
+                      ? Colors.orange.withOpacity(0.3)
+                      : Colors.grey.shade400,
+                ),
+              ),
             ),
             trailing: Text(
               '${stat['present']} / ${stat['total']} 명',
-              style: const TextStyle(
-                color: Colors.teal,
+              style: TextStyle(
+                color: isT ? Colors.orange : Colors.teal,
                 fontWeight: FontWeight.bold,
-                fontSize: 15,
               ),
-            ),
-            subtitle: Text(
-              presentNames.isEmpty ? "출석 인원 없음" : presentNames.join(', '),
-              style: const TextStyle(fontSize: 13, color: Colors.grey),
-              overflow: TextOverflow.ellipsis,
             ),
             children: [
+              _buildMemberGrid(Map<String, dynamic>.from(stat['records'])),
               Padding(
-                padding: const EdgeInsets.all(12),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: records.entries.map((e) {
-                    bool isPresent = e.value['status'] == '출석';
-                    return Chip(
-                      label: Text(
-                        e.key,
-                        style: TextStyle(
-                          color: isPresent
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      backgroundColor: isPresent
-                          ? Colors.teal
-                          : Colors.grey.shade100,
-                      side: BorderSide.none,
-                      visualDensity: VisualDensity.compact,
-                    );
-                  }).toList(),
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: TextButton.icon(
+                  // ✅ [수정] 버튼 클릭 시 핸들러 호출
+                  onPressed: () => _handleCellTap(actualId),
+                  icon: Icon(
+                    Icons.edit,
+                    size: 16,
+                    color: isT ? Colors.orange : Colors.teal,
+                  ),
+                  label: Text(
+                    isT ? "교사 출석 수정" : "학생 출석 수정",
+                    style: TextStyle(color: isT ? Colors.orange : Colors.teal),
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () => widget.onCellTap?.call(cell),
-                child: const Text("이 셀 출석 수정하기"),
               ),
             ],
           ),
@@ -386,20 +458,21 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildGroupedList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
       itemCount: _summaryList.length,
       itemBuilder: (context, index) {
         var item = _summaryList[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: const Icon(Icons.event_note, color: Colors.teal),
+            leading: const Icon(Icons.calendar_today, color: Colors.teal),
             title: Text(
               '${item['date']} 주일',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text('출석: ${item['present']}명 / 재적: ${item['total']}명'),
-            trailing: const Icon(Icons.chevron_right),
+            subtitle: Text(
+              '학생: ${item['sP']}/${item['sT']}  |  교사: ${item['tP']}/${item['tT']}',
+            ),
             onTap: () {
               setState(() {
                 _selectedDate = DateTime.parse(item['date']);
@@ -413,20 +486,31 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  Widget _statItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-      ],
+  Widget _buildMemberGrid(Map<String, dynamic> records) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: records.entries.map((e) {
+          bool isP = e.value['status'] == '출석';
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isP ? Colors.teal.withOpacity(0.1) : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              e.key,
+              style: TextStyle(
+                fontSize: 11,
+                color: isP ? Colors.teal.shade700 : Colors.grey.shade500,
+                fontWeight: isP ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -434,7 +518,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2024),
+      firstDate: DateTime(2026, 1, 1),
       lastDate: DateTime.now(),
       locale: const Locale('ko', 'KR'),
     );
