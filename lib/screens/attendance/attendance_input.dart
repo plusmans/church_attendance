@@ -21,6 +21,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
 
   final List<String> _absenceReasons = [
     '연락x',
+    '장기결석',
     '늦잠',
     '질병',
     '여행',
@@ -57,8 +58,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           ? DateTime.now()
           : _selectedDate,
       firstDate: DateTime(2025),
-      lastDate: DateTime.now(), // 👈 [핵심] 오늘 이후 날짜는 선택 불가
-      locale: const Locale('ko', 'KR'), // 👈 [핵심] 달력을 한국어(숫자 월)로 표시
+      lastDate: DateTime.now(),
+      locale: const Locale('ko', 'KR'),
       selectableDayPredicate: (DateTime date) {
         return date.weekday == DateTime.sunday;
       },
@@ -540,7 +541,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                         Icons.calendar_month,
                         color: Colors.teal,
                       ),
-                      // 💡 [수정] 날짜를 숫자로 보기 좋게 표시
                       label: Text(
                         DateFormat('yyyy. MM. dd').format(_selectedDate),
                         style: const TextStyle(
@@ -622,8 +622,9 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                               children: [
                                 Row(
                                   children: [
+                                    // ✅ [수정 완료] 이름 앞에 순번(index + 1) 추가
                                     Text(
-                                      name,
+                                      '${index + 1}. $name',
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
