@@ -39,6 +39,8 @@ dependencies:
   cloud_firestore: ^6.2.0
   flutter_localizations:
     sdk: flutter
+  pdf: ^3.12.0
+  printing: ^5.14.3
 
 dev_dependencies:
   flutter_test:

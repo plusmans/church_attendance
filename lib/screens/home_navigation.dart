@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'attendance/attendance_input.dart';
 import 'attendance/attendance_status.dart';
+import 'prayer/prayer_screen.dart'; 
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
@@ -26,7 +27,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
   @override
   void initState() {
     super.initState();
-    // 초기 진입 설정
+    // 초기 진입 설정: 역할에 따라 첫 화면 결정
     if (widget.role == '회계') {
       _selectedIndex = 1;
     } else if (widget.role == '부장' ||
@@ -93,12 +94,12 @@ class _HomeNavigationState extends State<HomeNavigation> {
           });
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: '출석'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: '출석통계'),
           BottomNavigationBarItem(
             icon: Icon(Icons.monetization_on),
             label: '헌금',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '기도'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '중보기도'),
           BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: '학생관리'),
         ],
       ),
@@ -121,7 +122,13 @@ class _HomeNavigationState extends State<HomeNavigation> {
       case 1:
         return const Center(child: Text('헌금 현황 (준비 중)'));
       case 2:
-        return const Center(child: Text('중보기도 (준비 중)'));
+        // 💡 [수정 완료] 중보기도 페이지 연결
+        // 관리자 기능을 위해 role 파라미터를 함께 전달합니다.
+        return PrayerScreen(
+          teacherName: widget.teacherName,
+          cell: widget.cell,
+          role: widget.role, 
+        );
       case 3:
         return const Center(child: Text('학생 관리 (준비 중)'));
       default:
