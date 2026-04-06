@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'attendance/attendance_status.dart';
 import 'attendance/attendance_input.dart';
 import 'management/student_management.dart';
+import 'prayer/prayer_screen.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
-  final String cell; // ✅ teacherCell에서 cell로 이름을 변경하여 main.dart와 일치시킴
+  final String cell; 
   final String role;
 
   const HomeNavigation({
-    super.key,
-    required this.teacherName,
-    required this.cell, // ✅ 생성자 매개변수 이름 수정
+    super.key, 
+    required this.teacherName, 
+    required this.cell, 
     required this.role,
   });
 
@@ -21,9 +22,8 @@ class HomeNavigation extends StatefulWidget {
 
 class _HomeNavigationState extends State<HomeNavigation> {
   int _selectedIndex = 0;
-  String? _autoSelectedCell;
+  String? _autoSelectedCell; 
 
-  // 표시할 화면 리스트
   late List<Widget> _screens;
 
   @override
@@ -33,40 +33,53 @@ class _HomeNavigationState extends State<HomeNavigation> {
   }
 
   void _buildScreens() {
-    // 현재 선택된 셀이 없으면 로그인한 사용자의 기본 셀 정보를 사용
     String defaultCell = _autoSelectedCell ?? widget.cell;
 
     _screens = [
-      // 1. 출석 현황 (통계/대시보드)
+      // 1. 출석 현황
       AttendanceStatusScreen(
         onCellTap: (cellId) {
           setState(() {
             _autoSelectedCell = cellId;
-            _selectedIndex = 1; // '입력' 탭으로 인덱스 전환
-            _buildScreens(); // 화면 리스트 재생성하여 인자 전달
+            _selectedIndex = 1; 
+            _buildScreens(); 
           });
         },
       ),
       // 2. 출석 입력
-      AttendanceInputScreen(teacherCell: defaultCell),
-      // 3. 학생 관리 (새친구 등반 및 학생 명단 관리)
+      AttendanceInputScreen(
+        teacherCell: defaultCell,
+      ),
+      // 3. 학생 관리
       const StudentManagementScreen(),
+      
+      // 4. 중보기도
+      // ✅ 실제 PrayerScreen의 요구사항에 맞게 필수 파라미터 3가지를 모두 전달합니다.
+      PrayerScreen(
+        teacherName: widget.teacherName,
+        cell: widget.cell,
+        role: widget.role,
+      ), 
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    // 현재 탭에 따른 테마 색상 설정 (학생 관리는 indigo, 나머지는 teal)
-    Color themeColor = _selectedIndex == 2 ? Colors.indigo : Colors.teal;
+    // 페이지별 테마 색상 설정 (현황/입력: teal, 학생관리: indigo, 중보기도: pink)
+    Color themeColor = Colors.teal;
+    if (_selectedIndex == 2) themeColor = Colors.indigo;
+    if (_selectedIndex == 3) themeColor = Colors.pinkAccent;
+
+    // 앱바 타이틀 설정
+    String appBarTitle = '출석 현황';
+    if (_selectedIndex == 1) appBarTitle = '출석 입력';
+    if (_selectedIndex == 2) appBarTitle = '학생 관리';
+    if (_selectedIndex == 3) appBarTitle = '중보기도';
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _selectedIndex == 0
-              ? '출석 현황'
-              : _selectedIndex == 1
-              ? '출석 입력'
-              : '학생 관리',
+          appBarTitle,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         backgroundColor: themeColor,
@@ -82,10 +95,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
                 children: [
                   Text(
                     '${widget.teacherName} 선생님',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                   Text(
                     '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})',
@@ -97,13 +107,16 @@ class _HomeNavigationState extends State<HomeNavigation> {
           ),
         ],
       ),
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
-            // 입력 탭이 아닌 다른 탭을 직접 눌러 이동할 때는 자동 선택값 초기화
+            // '출석 입력' 탭이 아닌 다른 메뉴를 누를 때는 자동 선택된 셀 정보를 초기화
             if (index != 1) {
               _autoSelectedCell = null;
             }
@@ -113,7 +126,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
         selectedItemColor: themeColor,
         unselectedItemColor: Colors.grey,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        type: BottomNavigationBarType.fixed,
+        type: BottomNavigationBarType.fixed, // 탭이 4개 이상일 때 아이콘 고정
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_rounded),
@@ -126,6 +139,10 @@ class _HomeNavigationState extends State<HomeNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.manage_accounts_rounded),
             label: '학생 관리',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.volunteer_activism), 
+            label: '중보기도',
           ),
         ],
       ),

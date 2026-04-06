@@ -19,7 +19,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   bool _isLoading = false;
 
   int _studentPresent = 0;
-  int _studentTotal = 0;
+  int _studentTotal = 0; // ✅ 이제 이 변수는 철저하게 'A그룹(재적)' 총합을 의미합니다.
   int _teacherPresent = 0;
   int _teacherTotal = 0;
 
@@ -49,6 +49,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   String _getWeekOfMonth(DateTime date) {
     int weekNum = ((date.day - 1) / 7).floor() + 1;
     return '${date.month}월 ${weekNum}주차';
+  }
+
+  String _normalizeName(dynamic rawName) {
+    if (rawName == null) return '이름없음';
+    return rawName.toString().replaceAll(' ', '');
   }
 
   Future<void> _fetchStats() async {
@@ -89,10 +94,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       if (_viewType == '주별') {
         Map<String, Map<String, dynamic>> baseStats = {};
 
-        // 교사 초기화
+        // 1. 교사 초기 명단 세팅
         Map<String, dynamic> teacherRecords = {};
         for (var doc in teacherSnap.docs) {
-          teacherRecords[doc['name'] ?? '이름없음'] = {'status': '결석'};
+          String name = _normalizeName(doc['name']);
+          teacherRecords[name] = {'status': '결석', 'group': 'T'};
         }
         baseStats['교사'] = {
           'id': 'teachers',
@@ -101,23 +107,25 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           'records': teacherRecords,
         };
 
-        // 학생 초기화
+        // 2. 학생 초기 명단 세팅
         for (var doc in studentSnap.docs) {
           String cell = doc['cell'] ?? '기타';
           String cleanCell = (int.tryParse(cell) ?? 0).toString();
-          String name = doc['name'] ?? '이름없음';
+          String name = _normalizeName(doc['name']);
+          String group = doc['group'] ?? (doc['isRegular'] == true ? 'A' : 'B');
 
           if (!baseStats.containsKey(cleanCell)) {
             baseStats[cleanCell] = {
               'id': cleanCell,
-              'total': 0,
+              'total': 0, // 여기서 total은 A그룹(재적) 인원수
               'present': 0,
               'records': <String, dynamic>{},
             };
           }
-          baseStats[cleanCell]!['total'] =
-              (baseStats[cleanCell]!['total'] as int) + 1;
-          baseStats[cleanCell]!['records'][name] = {'status': '결석'};
+          if (group == 'A') {
+            baseStats[cleanCell]!['total'] = (baseStats[cleanCell]!['total'] as int) + 1;
+          }
+          baseStats[cleanCell]!['records'][name] = {'status': '결석', 'group': group};
         }
 
         _processWeeklyData(snapshot, baseStats);
@@ -155,38 +163,75 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     QuerySnapshot snapshot,
     Map<String, Map<String, dynamic>> baseStats,
   ) {
-    int sP = 0;
-    int sT = 0;
-    int tP = 0;
-    int tT = 0;
+    int sP = 0; int sT = 0; int tP = 0; int tT = 0;
 
     for (var doc in snapshot.docs) {
       var data = doc.data() as Map<String, dynamic>;
       String docId = doc.id;
-      Map<String, dynamic> records = Map<String, dynamic>.from(
-        data['records'] ?? {},
-      );
-
-      int present = 0;
-      records.forEach((name, info) {
-        if (info is Map && info['status'] == '출석') present++;
-      });
+      Map<String, dynamic> attRecords = Map<String, dynamic>.from(data['records'] ?? {});
 
       if (docId.startsWith('teachers')) {
-        baseStats['교사'] = {
-          'id': 'teachers',
-          'total': records.length,
-          'present': present,
-          'records': records,
-        };
+        int present = 0;
+        attRecords.forEach((rawName, info) {
+          String name = _normalizeName(rawName);
+          String status = info is Map ? info['status'] : '결석';
+          if (status == '출석') present++;
+          
+          if (baseStats['교사']!['records'].containsKey(name)) {
+            baseStats['교사']!['records'][name]['status'] = status;
+          } else {
+            baseStats['교사']!['records'][name] = {'status': status, 'group': 'T'};
+          }
+        });
+        baseStats['교사']!['present'] = present;
+        baseStats['교사']!['total'] = baseStats['교사']!['records'].length;
       } else {
         String cleanId = (int.tryParse(docId.split('셀')[0]) ?? 0).toString();
-        baseStats[cleanId] = {
-          'id': cleanId,
-          'total': records.length,
-          'present': present,
-          'records': records,
-        };
+        
+        if (baseStats.containsKey(cleanId)) {
+          attRecords.forEach((rawName, info) {
+            String name = _normalizeName(rawName);
+            String status = info is Map ? info['status'] : '결석';
+            if (baseStats[cleanId]!['records'].containsKey(name)) {
+              baseStats[cleanId]!['records'][name]['status'] = status;
+            } else {
+              baseStats[cleanId]!['records'][name] = {
+                'status': status, 
+                'group': info is Map ? (info['group'] ?? 'A') : 'A'
+              };
+            }
+          });
+          
+          int present = 0;
+          int groupATotal = 0;
+          baseStats[cleanId]!['records'].forEach((name, info) {
+            if (info['status'] == '출석') present++;
+            if (info['group'] == 'A') groupATotal++;
+          });
+          baseStats[cleanId]!['present'] = present;
+          baseStats[cleanId]!['total'] = groupATotal; // ✅ 재적 기준 업데이트
+        } else {
+          int present = 0;
+          int groupATotal = 0;
+          Map<String, dynamic> mergedRecords = {};
+          attRecords.forEach((rawName, info) {
+            String name = _normalizeName(rawName);
+            String status = info is Map ? info['status'] : '결석';
+            String group = info is Map ? (info['group'] ?? 'A') : 'A';
+            if (status == '출석') present++;
+            if (group == 'A') groupATotal++;
+            mergedRecords[name] = {
+              'status': status,
+              'group': group
+            };
+          });
+          baseStats[cleanId] = {
+            'id': cleanId, 
+            'total': groupATotal, // ✅ 재적 기준 업데이트
+            'present': present, 
+            'records': mergedRecords
+          };
+        }
       }
     }
 
@@ -201,6 +246,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           'p': info['status'] == '출석' ? 1 : 0,
           't': 1,
           'role': cellKey == '교사' ? '교사' : '학생',
+          'group': info['group'] ?? 'A' 
         };
       });
 
@@ -209,7 +255,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         tT += stat['total'] as int;
       } else {
         sP += stat['present'] as int;
-        sT += stat['total'] as int;
+        sT += stat['total'] as int; // ✅ 셀별 재적 총합
       }
     });
 
@@ -226,7 +272,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         );
         _individualStats = individualWeekly;
         _studentPresent = sP;
-        _studentTotal = sT;
+        _studentTotal = sT; 
         _teacherPresent = tP;
         _teacherTotal = tT;
       });
@@ -244,14 +290,15 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     Map<String, Map<String, dynamic>> indv = {};
 
     for (var doc in tSnap.docs) {
-      String name = doc['name'] ?? '이름없음';
-      indv[name] = {'name': name, 'cell': '교사', 'p': 0, 't': 0, 'role': '교사'};
+      String name = _normalizeName(doc['name']);
+      indv[name] = {'name': name, 'cell': '교사', 'p': 0, 't': 0, 'role': '교사', 'group': 'T'};
       if (!cellHistory.containsKey('교사')) cellHistory['교사'] = [];
     }
     for (var doc in sSnap.docs) {
-      String name = doc['name'] ?? '이름없음';
+      String name = _normalizeName(doc['name']);
       String cellId = (doc['cell'] ?? '0').toString();
-      indv[name] = {'name': name, 'cell': cellId, 'p': 0, 't': 0, 'role': '학생'};
+      String group = doc['group'] ?? (doc['isRegular'] == true ? 'A' : 'B');
+      indv[name] = {'name': name, 'cell': cellId, 'p': 0, 't': 0, 'role': '학생', 'group': group};
       if (!cellHistory.containsKey(cellId)) cellHistory[cellId] = [];
     }
 
@@ -265,32 +312,42 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       );
 
       int present = 0;
-      records.forEach((name, info) {
+      int groupATotal = 0;
+
+      records.forEach((rawName, info) {
+        String name = _normalizeName(rawName);
         bool isPresent = info is Map && info['status'] == '출석';
-        if (isPresent) present++;
+        String group = 'A';
+
         if (indv.containsKey(name)) {
+          group = indv[name]!['group'] ?? 'A';
           indv[name]!['p'] += isPresent ? 1 : 0;
           indv[name]!['t'] += 1;
+        } else if (info is Map && info.containsKey('group')) {
+          group = info['group'];
         }
+
+        if (isPresent) present++;
+        if (group == 'A') groupATotal++;
       });
 
       if (!dateSummary.containsKey(dateStr)) {
         dateSummary[dateStr] = {'sP': 0, 'sT': 0, 'tP': 0, 'tT': 0};
       }
+      
       if (docId.startsWith('teachers')) {
-        dateSummary[dateStr]!['tP'] =
-            (dateSummary[dateStr]!['tP'] ?? 0) + present;
-        dateSummary[dateStr]!['tT'] =
-            (dateSummary[dateStr]!['tT'] ?? 0) + records.length;
+        dateSummary[dateStr]!['tP'] = (dateSummary[dateStr]!['tP'] ?? 0) + present;
+        dateSummary[dateStr]!['tT'] = (dateSummary[dateStr]!['tT'] ?? 0) + records.length;
         cellHistory['교사']!.add(records.isEmpty ? 0 : present / records.length);
       } else {
-        dateSummary[dateStr]!['sP'] =
-            (dateSummary[dateStr]!['sP'] ?? 0) + present;
-        dateSummary[dateStr]!['sT'] =
-            (dateSummary[dateStr]!['sT'] ?? 0) + records.length;
+        dateSummary[dateStr]!['sP'] = (dateSummary[dateStr]!['sP'] ?? 0) + present;
+        dateSummary[dateStr]!['sT'] = (dateSummary[dateStr]!['sT'] ?? 0) + groupATotal; // ✅ 학생 총계는 무조건 A그룹(재적) 합산
+        
         String cellId = docId.split('셀')[0];
-        double rate = records.isEmpty ? 0 : present / records.length;
+        // 0으로 나누기 방지 및 B그룹만 출석한 경우 100% 반영 처리
+        double rate = groupATotal > 0 ? present / groupATotal : (present > 0 ? 1.0 : 0.0);
         if (cellHistory.containsKey(cellId)) cellHistory[cellId]!.add(rate);
+        
         if (_viewType == '누적') {
           int m = dt.month;
           if (!monthHistory.containsKey(m)) monthHistory[m] = [];
@@ -299,56 +356,32 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       }
     }
 
-    _summaryList =
-        dateSummary.entries
-            .map(
-              (e) => {
-                'date': e.key,
-                'sP': e.value['sP'],
-                'sT': e.value['sT'],
-                'tP': e.value['tP'],
-                'tT': e.value['tT'],
-              },
-            )
-            .toList()
-          ..sort(
-            (a, b) => (b['date'] as String).compareTo(a['date'] as String),
-          );
+    _summaryList = dateSummary.entries.map((e) => {
+      'date': e.key,
+      'sP': e.value['sP'],
+      'sT': e.value['sT'],
+      'tP': e.value['tP'],
+      'tT': e.value['tT'],
+    }).toList()..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
 
     Map<String, double> cellAverages = {};
     cellHistory.forEach(
-      (cell, rates) => cellAverages[cell] = rates.isEmpty
-          ? 0.0
-          : rates.reduce((a, b) => a + b) / rates.length,
+      (cell, rates) => cellAverages[cell] = rates.isEmpty ? 0.0 : rates.reduce((a, b) => a + b) / rates.length,
     );
 
     Map<int, double> monthlyAverages = {};
     monthHistory.forEach(
-      (month, rates) => monthlyAverages[month] = rates.isEmpty
-          ? 0.0
-          : rates.reduce((a, b) => a + b) / rates.length,
+      (month, rates) => monthlyAverages[month] = rates.isEmpty ? 0.0 : rates.reduce((a, b) => a + b) / rates.length,
     );
 
     if (_summaryList.isNotEmpty) {
-      _studentPresent =
-          (_summaryList.map((e) => e['sP'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
-      _studentTotal =
-          (_summaryList.map((e) => e['sT'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
-      _teacherPresent =
-          (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
-      _teacherTotal =
-          (_summaryList.map((e) => e['tT'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
+      _studentPresent = (_summaryList.map((e) => e['sP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
+      _studentTotal = (_summaryList.map((e) => e['sT'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
+      _teacherPresent = (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
+      _teacherTotal = (_summaryList.map((e) => e['tT'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
     } else {
       _studentPresent = 0;
-      _studentTotal = sSnap.docs.length;
+      _studentTotal = sSnap.docs.where((d) => (d['group'] ?? (d['isRegular'] == true ? 'A' : 'B')) == 'A').length; // 초기화면 A그룹 총원 카운트
       _teacherPresent = 0;
       _teacherTotal = tSnap.docs.length;
     }
@@ -390,10 +423,10 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget _buildSummaryHeader() {
     double sRate = _studentTotal > 0
         ? (_studentPresent / _studentTotal) * 100
-        : 0;
+        : (_studentPresent > 0 ? 100 : 0);
     double tRate = _teacherTotal > 0
         ? (_teacherPresent / _teacherTotal) * 100
-        : 0;
+        : (_teacherPresent > 0 ? 100 : 0);
     String titleText = _viewType == '주별'
         ? DateFormat('yyyy년 MM월 dd일').format(_selectedDate)
         : _viewType == '월별'
@@ -466,10 +499,26 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              "$p / $t",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  "$p / $t",
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                // ✅ 재적 표기 추가
+                if (title == "학생")
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 2),
+                    child: Text(
+                      "(재적)",
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                  ),
+              ],
             ),
+            const SizedBox(height: 2),
             Text(
               "${r.toStringAsFixed(1)}%",
               style: TextStyle(color: c, fontSize: 12),
@@ -682,6 +731,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildIndividualCard(Map<String, dynamic> item) {
     bool isTeacher = item['role'] == '교사';
+    String group = item['group'] ?? 'A'; 
+    
     Widget trailing;
     if (_viewType == '주별') {
       bool isP = item['status'] == '출석';
@@ -722,6 +773,10 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       );
     }
 
+    String subtitleText = isTeacher
+        ? '중등부 교사'
+        : '${item['cell'].toString().padLeft(2, '0')}셀 학생${group == 'B' ? ' (B그룹)' : ' (A그룹)'}';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
@@ -733,11 +788,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         leading: CircleAvatar(
           backgroundColor: isTeacher
               ? Colors.orange.shade50
-              : Colors.blue.shade50,
+              : (group == 'B' ? Colors.orange.shade50 : Colors.blue.shade50),
           child: Text(
             item['name']?[0] ?? '?',
             style: TextStyle(
-              color: isTeacher ? Colors.orange : Colors.blue,
+              color: isTeacher ? Colors.orange : (group == 'B' ? Colors.orange : Colors.blue),
               fontWeight: FontWeight.bold,
               fontSize: 14,
             ),
@@ -748,9 +803,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
         ),
         subtitle: Text(
-          isTeacher
-              ? '중등부 교사'
-              : '${item['cell'].toString().padLeft(2, '0')}셀 학생',
+          subtitleText,
           style: const TextStyle(fontSize: 12, color: Colors.grey),
         ),
         trailing: trailing,
@@ -759,10 +812,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildWeeklyDetailList() {
-    if (_cellStats.isEmpty)
+    if (_cellStats.isEmpty) {
       return const Center(
         child: Text("표시할 명단이 없습니다.", style: TextStyle(color: Colors.grey)),
       );
+    }
     List<Widget> listItems = [_buildDashboardArea()];
     _cellStats.forEach((displayKey, stat) {
       String actualId = stat['id'];
@@ -792,15 +846,16 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                 ),
               ),
             ),
+            // ✅ 셀의 트레일링 텍스트에 "재적" 표기 명확히
             trailing: Text(
-              '${stat['present']} / ${stat['total']} 명',
+              isT ? '${stat['present']} / ${stat['total']} 명' : '${stat['present']} / 재적 ${stat['total']} 명',
               style: TextStyle(
                 color: isT ? Colors.orange : Colors.teal,
                 fontWeight: FontWeight.bold,
               ),
             ),
             children: [
-              _buildMemberGrid(Map<String, dynamic>.from(stat['records'])),
+              _buildMemberGrid(Map<String, dynamic>.from(stat['records']), isTeacher: isT),
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: TextButton.icon(
@@ -822,6 +877,64 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       );
     });
     return ListView(padding: const EdgeInsets.all(16), children: listItems);
+  }
+
+  Widget _buildMemberGrid(Map<String, dynamic> records, {bool isTeacher = false}) {
+    if (isTeacher) {
+      var sortedEntries = records.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+        child: _buildChipWrap(sortedEntries)
+      );
+    }
+
+    var groupA = records.entries.where((e) => e.value['group'] == 'A').toList()..sort((a, b) => a.key.compareTo(b.key));
+    var groupB = records.entries.where((e) => e.value['group'] == 'B').toList()..sort((a, b) => a.key.compareTo(b.key));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (groupA.isNotEmpty) ...[
+            const Text('A그룹', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.indigo)),
+            const SizedBox(height: 6),
+            _buildChipWrap(groupA),
+          ],
+          if (groupA.isNotEmpty && groupB.isNotEmpty) const SizedBox(height: 12),
+          if (groupB.isNotEmpty) ...[
+            const Text('B그룹', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+            const SizedBox(height: 6),
+            _buildChipWrap(groupB),
+          ]
+        ]
+      )
+    );
+  }
+
+  Widget _buildChipWrap(List<MapEntry<String, dynamic>> entries) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: entries.map((e) {
+        bool isP = e.value['status'] == '출석';
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: isP ? Colors.teal.withOpacity(0.1) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            e.key,
+            style: TextStyle(
+              fontSize: 11,
+              color: isP ? Colors.teal.shade700 : Colors.grey.shade500,
+              fontWeight: isP ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildMonthlyDashboard() {
@@ -895,8 +1008,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       ],
     );
   }
-
-  // ✅ 누락된 UI 함수 정의들
 
   Widget _buildRankingArea(String title, Color mainColor) {
     var sortedCells = _cellAverages.entries.toList()
@@ -1021,7 +1132,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                       DateTime dt = DateTime.parse(item['date']);
                       double rate = (item['sT'] ?? 0) > 0
                           ? (item['sP'] / item['sT'])
-                          : 0;
+                          : (item['sP'] > 0 ? 1.0 : 0.0);
                       return Column(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -1036,7 +1147,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                           const SizedBox(height: 4),
                           Container(
                             width: 32,
-                            height: rate * 80 + 5,
+                            height: (rate > 1.0 ? 1.0 : rate) * 80 + 5,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
@@ -1116,7 +1227,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                           const SizedBox(height: 4),
                           Container(
                             width: 20,
-                            height: rate * 90 + 5,
+                            height: (rate > 1.0 ? 1.0 : rate) * 90 + 5,
                             decoration: BoxDecoration(
                               color: Colors.indigo.shade400,
                               borderRadius: const BorderRadius.vertical(
@@ -1224,8 +1335,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildModernDateCard(Map<String, dynamic> item) {
     DateTime dt = DateTime.parse(item['date']);
-    double sRate = (item['sT'] ?? 0) > 0 ? (item['sP'] / item['sT']) : 0;
-    double tRate = (item['tT'] ?? 0) > 0 ? (item['tP'] / item['tT']) : 0;
+    double sRate = (item['sT'] ?? 0) > 0 ? (item['sP'] / item['sT']) : (item['sP'] > 0 ? 1.0 : 0.0);
+    double tRate = (item['tT'] ?? 0) > 0 ? (item['tP'] / item['tT']) : (item['tP'] > 0 ? 1.0 : 0.0);
     String grade = sRate >= 0.9
         ? '최상'
         : sRate >= 0.7
@@ -1318,8 +1429,9 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                             ),
                           ),
                           const Spacer(),
+                          // ✅ 여기서도 재적임을 명시
                           Text(
-                            '${item['sP']}/${item['sT']}명',
+                            '${item['sP']} / 재적 ${item['sT']}명',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1329,7 +1441,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                       ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
-                        value: sRate,
+                        value: sRate > 1.0 ? 1.0 : sRate,
                         minHeight: 4,
                         color: Colors.blue,
                         backgroundColor: Colors.blue.withOpacity(0.1),
@@ -1360,7 +1472,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                           ),
                           const Spacer(),
                           Text(
-                            '${item['tP']}/${item['tT']}명',
+                            '${item['tP']} / ${item['tT']}명',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -1370,7 +1482,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                       ),
                       const SizedBox(height: 6),
                       LinearProgressIndicator(
-                        value: tRate,
+                        value: tRate > 1.0 ? 1.0 : tRate,
                         minHeight: 4,
                         color: Colors.orange,
                         backgroundColor: Colors.orange.withOpacity(0.1),
@@ -1391,10 +1503,10 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       ..sort((a, b) {
         double rateA = a.value['total'] > 0
             ? (a.value['present'] / a.value['total'])
-            : 0;
+            : (a.value['present'] > 0 ? 1.0 : 0.0);
         double rateB = b.value['total'] > 0
             ? (b.value['present'] / b.value['total'])
-            : 0;
+            : (b.value['present'] > 0 ? 1.0 : 0.0);
         return rateB.compareTo(rateA);
       });
     return Container(
@@ -1422,7 +1534,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           ...studentCells.map((e) {
             double rate = e.value['total'] > 0
                 ? e.value['present'] / e.value['total']
-                : 0;
+                : (e.value['present'] > 0 ? 1.0 : 0.0);
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -1438,11 +1550,22 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                     ),
                   ),
                   Expanded(
-                    child: LinearProgressIndicator(
-                      value: rate,
-                      color: rate >= 0.8 ? Colors.teal : Colors.orange,
-                      backgroundColor: Colors.grey.shade100,
-                      minHeight: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: rate > 1.0 ? 1.0 : rate,
+                          color: rate >= 0.8 ? Colors.teal : Colors.orange,
+                          backgroundColor: Colors.grey.shade100,
+                          minHeight: 12,
+                        ),
+                        const SizedBox(height: 4),
+                        // ✅ 분모가 재적임을 확실하게 설명
+                        Text(
+                          '출석 ${e.value['present']}명 / 재적 ${e.value['total']}명',
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1458,36 +1581,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             );
           }).toList(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMemberGrid(Map<String, dynamic> records) {
-    var sortedEntries = records.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: sortedEntries.map((e) {
-          bool isP = e.value['status'] == '출석';
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: isP ? Colors.teal.withOpacity(0.1) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              e.key,
-              style: TextStyle(
-                fontSize: 11,
-                color: isP ? Colors.teal.shade700 : Colors.grey.shade500,
-                fontWeight: isP ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }
