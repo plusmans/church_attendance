@@ -6,13 +6,13 @@ import 'prayer/prayer_screen.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
-  final String cell; 
+  final String cell;
   final String role;
 
   const HomeNavigation({
-    super.key, 
-    required this.teacherName, 
-    required this.cell, 
+    super.key,
+    required this.teacherName,
+    required this.cell,
     required this.role,
   });
 
@@ -21,8 +21,10 @@ class HomeNavigation extends StatefulWidget {
 }
 
 class _HomeNavigationState extends State<HomeNavigation> {
-  int _selectedIndex = 0;
-  String? _autoSelectedCell; 
+  // ✅ 1. 앱 시작 시 무조건 '출석 입력' 탭이 뜨도록 설정합니다.
+  // (주의: 코드 적용 후 반드시 앱을 '완전히 재시작(Hot Restart)' 해야 반영됩니다!)
+  int _selectedIndex = 1;
+  String? _autoSelectedCell;
 
   late List<Widget> _screens;
 
@@ -36,36 +38,32 @@ class _HomeNavigationState extends State<HomeNavigation> {
     String defaultCell = _autoSelectedCell ?? widget.cell;
 
     _screens = [
-      // 1. 출석 현황
+      // 0. 출석 현황
       AttendanceStatusScreen(
         onCellTap: (cellId) {
           setState(() {
             _autoSelectedCell = cellId;
-            _selectedIndex = 1; 
-            _buildScreens(); 
+            _selectedIndex = 1;
+            _buildScreens();
           });
         },
       ),
-      // 2. 출석 입력
-      AttendanceInputScreen(
-        teacherCell: defaultCell,
-      ),
-      // 3. 학생 관리
+      // 1. 출석 입력 (기본 시작 화면)
+      AttendanceInputScreen(teacherCell: defaultCell),
+      // 2. 학생 관리
       const StudentManagementScreen(),
-      
-      // 4. 중보기도
-      // ✅ 실제 PrayerScreen의 요구사항에 맞게 필수 파라미터 3가지를 모두 전달합니다.
+      // 3. 중보기도
       PrayerScreen(
         teacherName: widget.teacherName,
         cell: widget.cell,
         role: widget.role,
-      ), 
+      ),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    // 페이지별 테마 색상 설정 (현황/입력: teal, 학생관리: indigo, 중보기도: pink)
+    // 페이지별 테마 색상 설정
     Color themeColor = Colors.teal;
     if (_selectedIndex == 2) themeColor = Colors.indigo;
     if (_selectedIndex == 3) themeColor = Colors.pinkAccent;
@@ -75,6 +73,12 @@ class _HomeNavigationState extends State<HomeNavigation> {
     if (_selectedIndex == 1) appBarTitle = '출석 입력';
     if (_selectedIndex == 2) appBarTitle = '학생 관리';
     if (_selectedIndex == 3) appBarTitle = '중보기도';
+
+    // ✅ 2. 관리자(admin) 계정 직분 처리
+    bool isSuperAdmin = widget.role == 'admin' || widget.role == '개발자';
+    String displayRole = isSuperAdmin
+        ? '👑 시스템 관리자'
+        : '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})';
 
     return Scaffold(
       appBar: AppBar(
@@ -94,12 +98,23 @@ class _HomeNavigationState extends State<HomeNavigation> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${widget.teacherName} 선생님',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    '${widget.teacherName} ${isSuperAdmin ? '님' : '선생님'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
-                    '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})',
-                    style: const TextStyle(fontSize: 10, color: Colors.white70),
+                    displayRole,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isSuperAdmin
+                          ? Colors.yellowAccent
+                          : Colors.white70,
+                      fontWeight: isSuperAdmin
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
                   ),
                 ],
               ),
@@ -107,10 +122,10 @@ class _HomeNavigationState extends State<HomeNavigation> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      // ✅ 3. 핵심 해결! IndexedStack을 완전히 지우고 아래 코드로 대체했습니다.
+      // 이제 탭을 누를 때마다 이전 화면을 완전히 끄고 새 화면을 불러와서 항상 100% 최신화됩니다.
+      body: _screens[_selectedIndex],
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -126,7 +141,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
         selectedItemColor: themeColor,
         unselectedItemColor: Colors.grey,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        type: BottomNavigationBarType.fixed, // 탭이 4개 이상일 때 아이콘 고정
+        type: BottomNavigationBarType.fixed, // 탭 4개 이상일 때 아이콘 고정
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_rounded),
@@ -141,7 +156,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
             label: '학생 관리',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.volunteer_activism), 
+            icon: Icon(Icons.volunteer_activism),
             label: '중보기도',
           ),
         ],
