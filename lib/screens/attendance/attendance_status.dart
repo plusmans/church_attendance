@@ -19,7 +19,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   bool _isLoading = false;
 
   int _studentPresent = 0;
-  int _studentTotal = 0;
+  int _studentTotal = 0; 
   int _teacherPresent = 0;
   int _teacherTotal = 0;
 
@@ -72,12 +72,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       String startStr = DateFormat('yyyy-MM-dd').format(startDate);
       String endStr = DateFormat('yyyy-MM-dd').format(endDate);
 
-      var teacherSnap = await FirebaseFirestore.instance
-          .collection('teachers')
-          .get();
-      var studentSnap = await FirebaseFirestore.instance
-          .collection('students')
-          .get();
+      var teacherSnap = await FirebaseFirestore.instance.collection('teachers').get();
+      var studentSnap = await FirebaseFirestore.instance.collection('students').get();
 
       var snapshot = await FirebaseFirestore.instance
           .collection('attendance')
@@ -115,13 +111,9 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             };
           }
           if (group == 'A') {
-            baseStats[cleanCell]!['total'] =
-                (baseStats[cleanCell]!['total'] as int) + 1;
+            baseStats[cleanCell]!['total'] = (baseStats[cleanCell]!['total'] as int) + 1;
           }
-          baseStats[cleanCell]!['records'][name] = {
-            'status': '결석',
-            'group': group,
-          };
+          baseStats[cleanCell]!['records'][name] = {'status': '결석', 'group': group};
         }
         _processWeeklyData(snapshot, baseStats);
       } else {
@@ -134,20 +126,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     }
   }
 
-  void _processWeeklyData(
-    QuerySnapshot snapshot,
-    Map<String, Map<String, dynamic>> baseStats,
-  ) {
-    int sP = 0;
-    int sT = 0;
-    int tP = 0;
-    int tT = 0;
+  void _processWeeklyData(QuerySnapshot snapshot, Map<String, Map<String, dynamic>> baseStats) {
+    int sP = 0; int sT = 0; int tP = 0; int tT = 0;
     for (var doc in snapshot.docs) {
       var data = doc.data() as Map<String, dynamic>;
       String docId = doc.id;
-      Map<String, dynamic> attRecords = Map<String, dynamic>.from(
-        data['records'] ?? {},
-      );
+      Map<String, dynamic> attRecords = Map<String, dynamic>.from(data['records'] ?? {});
 
       if (docId.startsWith('teachers')) {
         int present = 0;
@@ -182,48 +166,27 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     baseStats.forEach((cellKey, stat) {
       stat['records'].forEach((name, info) {
         individualWeekly[name] = {
-          'name': name,
-          'cell': cellKey == '교사' ? '교사' : cellKey,
-          'status': info['status'],
-          'p': info['status'] == '출석' ? 1 : 0,
-          't': 1,
-          'role': cellKey == '교사' ? '교사' : '학생',
-          'group': info['group'] ?? 'A',
+          'name': name, 'cell': cellKey == '교사' ? '교사' : cellKey,
+          'status': info['status'], 'p': info['status'] == '출석' ? 1 : 0,
+          't': 1, 'role': cellKey == '교사' ? '교사' : '학생', 'group': info['group'] ?? 'A',
         };
       });
-      if (cellKey == '교사') {
-        tP += stat['present'] as int;
-        tT += stat['total'] as int;
-      } else {
-        sP += stat['present'] as int;
-        sT += stat['total'] as int;
-      }
+      if (cellKey == '교사') { tP += stat['present'] as int; tT += stat['total'] as int; }
+      else { sP += stat['present'] as int; sT += stat['total'] as int; }
     });
     if (mounted) {
       setState(() {
-        _cellStats = Map.fromEntries(
-          baseStats.entries.toList()..sort((a, b) {
-            if (a.key == '교사') return 1;
-            if (b.key == '교사') return -1;
-            return (int.tryParse(a.key) ?? 99).compareTo(
-              int.tryParse(b.key) ?? 99,
-            );
-          }),
-        );
+        _cellStats = Map.fromEntries(baseStats.entries.toList()..sort((a, b) {
+          if (a.key == '교사') return 1; if (b.key == '교사') return -1;
+          return (int.tryParse(a.key) ?? 99).compareTo(int.tryParse(b.key) ?? 99);
+        }));
         _individualStats = individualWeekly;
-        _studentPresent = sP;
-        _studentTotal = sT;
-        _teacherPresent = tP;
-        _teacherTotal = tT;
+        _studentPresent = sP; _studentTotal = sT; _teacherPresent = tP; _teacherTotal = tT;
       });
     }
   }
 
-  void _processGroupedData(
-    QuerySnapshot snapshot,
-    QuerySnapshot tSnap,
-    QuerySnapshot sSnap,
-  ) {
+  void _processGroupedData(QuerySnapshot snapshot, QuerySnapshot tSnap, QuerySnapshot sSnap) {
     Map<String, Map<String, int>> dateSummary = {};
     Map<String, List<double>> cellHistory = {};
     Map<String, Map<String, dynamic>> indv = {};
@@ -236,14 +199,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
     for (var doc in tSnap.docs) {
       String name = _normalizeName(doc['name']);
-      indv[name] = {
-        'name': name,
-        'cell': '교사',
-        'p': 0,
-        't': 0,
-        'role': '교사',
-        'group': 'T',
-      };
+      indv[name] = {'name': name, 'cell': '교사', 'p': 0, 't': 0, 'role': '교사', 'group': 'T'};
       if (!cellHistory.containsKey('교사')) cellHistory['교사'] = [];
     }
     for (var doc in sSnap.docs) {
@@ -253,20 +209,20 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       String group = data['group'] ?? (data['isRegular'] == true ? 'A' : 'B');
       String dbRole = data['role'] ?? '학생';
       String promotedAt = data['promotedAt'] ?? '';
-      String firstVisitDate = data['firstVisitDate'] ?? '';
-      String evangelist = data['evangelist'] ?? '';
-
+      String firstVisitDate = data['firstVisitDate'] ?? ''; 
+      String evangelist = data['evangelist'] ?? ''; 
+      
       indv[name] = {
-        'name': name,
-        'cell': cellId,
-        'p': 0,
-        't': 0,
-        'role': '학생',
+        'name': name, 
+        'cell': cellId, 
+        'p': 0, 
+        't': 0, 
+        'role': '학생', 
         'group': group,
         'dbRole': dbRole,
         'promotedAt': promotedAt,
-        'firstVisitDate': firstVisitDate,
-        'evangelist': evangelist,
+        'firstVisitDate': firstVisitDate, 
+        'evangelist': evangelist, 
       };
       if (!cellHistory.containsKey(cellId)) cellHistory[cellId] = [];
     }
@@ -275,11 +231,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       var data = doc.data() as Map<String, dynamic>;
       String dateStr = data['date'];
       String docId = doc.id;
-      Map<String, dynamic> records = Map<String, dynamic>.from(
-        data['records'] ?? {},
-      );
-      int present = 0;
-      int groupATotal = 0;
+      Map<String, dynamic> records = Map<String, dynamic>.from(data['records'] ?? {});
+      int present = 0; int groupATotal = 0;
       records.forEach((rawName, info) {
         String name = _normalizeName(rawName);
         bool isPresent = info is Map && info['status'] == '출석';
@@ -296,68 +249,32 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         dateSummary[dateStr] = {'sP': 0, 'sT': 0, 'tP': 0, 'tT': 0};
       }
       if (docId.startsWith('teachers')) {
-        dateSummary[dateStr]!['tP'] =
-            (dateSummary[dateStr]!['tP'] ?? 0) + present;
-        dateSummary[dateStr]!['tT'] =
-            (dateSummary[dateStr]!['tT'] ?? 0) + records.length;
+        dateSummary[dateStr]!['tP'] = (dateSummary[dateStr]!['tP'] ?? 0) + present;
+        dateSummary[dateStr]!['tT'] = (dateSummary[dateStr]!['tT'] ?? 0) + records.length;
         cellHistory['교사']!.add(records.isEmpty ? 0 : present / records.length);
       } else {
-        dateSummary[dateStr]!['sP'] =
-            (dateSummary[dateStr]!['sP'] ?? 0) + present;
-        dateSummary[dateStr]!['sT'] =
-            (dateSummary[dateStr]!['sT'] ?? 0) + groupATotal;
+        dateSummary[dateStr]!['sP'] = (dateSummary[dateStr]!['sP'] ?? 0) + present;
+        dateSummary[dateStr]!['sT'] = (dateSummary[dateStr]!['sT'] ?? 0) + groupATotal;
         String cellId = docId.split('셀')[0];
-        double rate = groupATotal > 0
-            ? present / groupATotal
-            : (present > 0 ? 1.0 : 0.0);
+        double rate = groupATotal > 0 ? present / groupATotal : (present > 0 ? 1.0 : 0.0);
         if (cellHistory.containsKey(cellId)) cellHistory[cellId]!.add(rate);
       }
     }
-    _summaryList =
-        dateSummary.entries
-            .map(
-              (e) => {
-                'date': e.key,
-                'sP': e.value['sP'],
-                'sT': e.value['sT'],
-                'tP': e.value['tP'],
-                'tT': e.value['tT'],
-              },
-            )
-            .toList()
-          ..sort(
-            (a, b) => (b['date'] as String).compareTo(a['date'] as String),
-          );
+    _summaryList = dateSummary.entries.map((e) => {
+      'date': e.key, 'sP': e.value['sP'], 'sT': e.value['sT'], 'tP': e.value['tP'], 'tT': e.value['tT'],
+    }).toList()..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
 
     Map<String, double> cellAverages = {};
-    cellHistory.forEach(
-      (cell, rates) => cellAverages[cell] = rates.isEmpty
-          ? 0.0
-          : rates.reduce((a, b) => a + b) / rates.length,
-    );
+    cellHistory.forEach((cell, rates) => cellAverages[cell] = rates.isEmpty ? 0.0 : rates.reduce((a, b) => a + b) / rates.length);
 
     if (_summaryList.isNotEmpty) {
-      _studentPresent =
-          (_summaryList.map((e) => e['sP'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
-      _teacherPresent =
-          (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) /
-                  _summaryList.length)
-              .round();
-      _studentTotal = latestStudentTotal;
-      _teacherTotal = latestTeacherTotal;
+      _studentPresent = (_summaryList.map((e) => e['sP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
+      _teacherPresent = (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
+      _studentTotal = latestStudentTotal; _teacherTotal = latestTeacherTotal;
     } else {
-      _studentPresent = 0;
-      _studentTotal = latestStudentTotal;
-      _teacherPresent = 0;
-      _teacherTotal = latestTeacherTotal;
+      _studentPresent = 0; _studentTotal = latestStudentTotal; _teacherPresent = 0; _teacherTotal = latestTeacherTotal;
     }
-    if (mounted)
-      setState(() {
-        _cellAverages = cellAverages;
-        _individualStats = indv;
-      });
+    if (mounted) setState(() { _cellAverages = cellAverages; _individualStats = indv; });
   }
 
   @override
@@ -384,12 +301,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildSummaryHeader() {
-    double sRate = _studentTotal > 0
-        ? (_studentPresent / _studentTotal) * 100
-        : 0;
-    double tRate = _teacherTotal > 0
-        ? (_teacherPresent / _teacherTotal) * 100
-        : 0;
+    double sRate = _studentTotal > 0 ? (_studentPresent / _studentTotal) * 100 : 0;
+    double tRate = _teacherTotal > 0 ? (_teacherPresent / _teacherTotal) * 100 : 0;
     String titleText = _viewType == '주별'
         ? DateFormat('yyyy년 MM월 dd일').format(_selectedDate)
         : _viewType == '월별'
@@ -404,37 +317,17 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  titleText,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.teal,
-                  ),
-                ),
-                if (_viewType != '누적')
-                  const Icon(Icons.arrow_drop_down, color: Colors.teal),
+                Text(titleText, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
+                if (_viewType != '누적') const Icon(Icons.arrow_drop_down, color: Colors.teal),
               ],
             ),
           ),
           const SizedBox(height: 15),
           Row(
             children: [
-              _buildSummaryCard(
-                "학생 (재적)",
-                _studentPresent,
-                _studentTotal,
-                sRate,
-                Colors.blue,
-              ),
+              _buildSummaryCard("학생 (재적)", _studentPresent, _studentTotal, sRate, Colors.blue),
               const SizedBox(width: 10),
-              _buildSummaryCard(
-                "교사",
-                _teacherPresent,
-                _teacherTotal,
-                tRate,
-                Colors.orange,
-              ),
+              _buildSummaryCard("교사", _teacherPresent, _teacherTotal, tRate, Colors.orange),
             ],
           ),
         ],
@@ -446,35 +339,14 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: c.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: c.withOpacity(0.2)),
-        ),
+        decoration: BoxDecoration(color: c.withOpacity(0.05), borderRadius: BorderRadius.circular(15), border: Border.all(color: c.withOpacity(0.2))),
         child: Column(
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                color: c,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
+            Text(title, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 12)),
             const SizedBox(height: 4),
-            Text(
-              "$p / $t",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            Text("$p / $t", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 2),
-            Text(
-              "${r.toStringAsFixed(1)}%",
-              style: TextStyle(
-                color: c,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text("${r.toStringAsFixed(1)}%", style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -488,27 +360,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         children: ['주별', '월별', '누적'].map((type) {
           return Expanded(
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _viewType = type;
-                  _fetchStats();
-                });
-              },
+              onTap: () { setState(() { _viewType = type; _fetchStats(); }); },
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: _viewType == type ? Colors.teal : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  type,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _viewType == type ? Colors.white : Colors.grey,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                decoration: BoxDecoration(color: _viewType == type ? Colors.teal : Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+                child: Text(type, textAlign: TextAlign.center, style: TextStyle(color: _viewType == type ? Colors.white : Colors.grey, fontWeight: FontWeight.bold)),
               ),
             ),
           );
@@ -525,39 +382,15 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         children: [
           Row(
             children: [
-              _toggleButton(
-                '셀별',
-                _groupingMode == '셀별',
-                () => setState(() => _groupingMode = '셀별'),
-              ),
+              _toggleButton('셀별', _groupingMode == '셀별', () => setState(() => _groupingMode = '셀별')),
               const SizedBox(width: 8),
-              _toggleButton(
-                '개인별',
-                _groupingMode == '개인별',
-                () => setState(() => _groupingMode = '개인별'),
-              ),
+              _toggleButton('개인별', _groupingMode == '개인별', () => setState(() => _groupingMode = '개인별')),
             ],
           ),
           if (_groupingMode == '개인별')
             InkWell(
-              onTap: () => setState(
-                () => _individualSortMode = _individualSortMode == '셀순'
-                    ? '랭킹순'
-                    : '셀순',
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    _individualSortMode,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.blueGrey,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Icon(Icons.sort, size: 14),
-                ],
-              ),
+              onTap: () => setState(() => _individualSortMode = _individualSortMode == '셀순' ? '랭킹순' : '셀순'),
+              child: Row(children: [Text(_individualSortMode, style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontWeight: FontWeight.bold)), const Icon(Icons.sort, size: 14)]),
             ),
         ],
       ),
@@ -569,21 +402,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.blueGrey : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? Colors.blueGrey : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : Colors.grey.shade600,
-          ),
-        ),
+        decoration: BoxDecoration(color: isSelected ? Colors.blueGrey : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: isSelected ? Colors.blueGrey : Colors.grey.shade300)),
+        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSelected ? Colors.white : Colors.grey.shade600)),
       ),
     );
   }
@@ -595,10 +415,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         if (_viewType == '월별' || _viewType == '누적') _buildMonthlyInsights(),
         _buildTrendChart(),
         const SizedBox(height: 24),
-        _buildRankingArea(
-          _viewType == '누적' ? '연간 평균 출석률 순위 🏆' : '반별 평균 출석률 🏆',
-          Colors.orange,
-        ),
+        _buildRankingArea(_viewType == '누적' ? '연간 평균 출석률 순위 🏆' : '반별 평균 출석률 🏆', Colors.orange),
         const SizedBox(height: 24),
         _buildPastoralSections(),
       ],
@@ -614,23 +431,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     var perfectList = _individualStats.values
         .where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0)
         .toList();
-
+    
     var promotedList = _individualStats.values
-        .where(
-          (m) =>
-              m['role'] == '학생' &&
-              m['promotedAt'] != null &&
-              m['promotedAt'].toString().startsWith(dateFilter),
-        )
+        .where((m) => m['role'] == '학생' && m['promotedAt'] != null && m['promotedAt'].toString().startsWith(dateFilter))
         .toList();
 
     var firstVisitList = _individualStats.values
-        .where(
-          (m) =>
-              m['role'] == '학생' &&
-              m['firstVisitDate'] != null &&
-              m['firstVisitDate'].toString().startsWith(dateFilter),
-        )
+        .where((m) => m['role'] == '학생' && m['firstVisitDate'] != null && m['firstVisitDate'].toString().startsWith(dateFilter))
         .toList();
 
     var absentList = _individualStats.values
@@ -642,112 +449,92 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         .toList();
 
     var otherBGroup = _individualStats.values
-        .where(
-          (m) =>
-              m['role'] == '학생' &&
-              m['group'] == "B" &&
-              m['dbRole'] != "새친구" &&
-              m['t'] > 0,
-        )
+        .where((m) => m['role'] == '학생' && m['group'] == "B" && m['dbRole'] != "새친구" && m['t'] > 0)
         .toList();
 
-    // 전도자 집계 로직
     Map<String, List<String>> evangelistMap = {};
     for (var m in firstVisitList) {
       String evName = m['evangelist']?.toString().trim() ?? '';
-      // ✅ "자진"인 경우는 전도자 명단에서 제외
       if (evName.isNotEmpty && evName != "자진") {
         if (!evangelistMap.containsKey(evName)) evangelistMap[evName] = [];
         evangelistMap[evName]!.add(m['name']);
       }
     }
-
-    var evangelistList = evangelistMap.entries
-        .map(
-          (e) => {'evangelist': e.key, 'invitedStudents': e.value.join(', ')},
-        )
-        .toList();
+    
+    var evangelistList = evangelistMap.entries.map((e) => {
+      'evangelist': e.key,
+      'invitedStudents': e.value.join(', ')
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildNameListSection(
-          "$filterLabelPrefix 개근자 명단 🏆",
-          perfectList,
+          "$filterLabelPrefix 개근자 명단 🏆", 
+          perfectList, 
           Colors.teal,
-          description: "선택된 기간 동안 한 번도 빠지지 않은 자랑스러운 얼굴들입니다.",
+          description: "선택된 기간 동안 한 번도 빠지지 않은 자랑스러운 얼굴들입니다."
         ),
         const SizedBox(height: 24),
 
         _buildEvangelistSection(
-          "📢 $filterLabelPrefix 전도자",
-          evangelistList,
+          "📢 $filterLabelPrefix 전도자", 
+          evangelistList, 
           Colors.purple,
-          description: "새친구를 인도하여 하나님 나라를 확장한 귀한 분들입니다. (자진 제외)",
+          description: "새친구를 인도하여 하나님 나라를 확장한 귀한 분들입니다. (자진 제외)"
         ),
         const SizedBox(height: 24),
-
+        
         if (firstVisitList.isNotEmpty) ...[
           _buildNameListSection(
-            "🎁 $filterLabelPrefix 새친구 방문",
-            firstVisitList,
+            "🎁 $filterLabelPrefix 새친구 방문", 
+            firstVisitList, 
             Colors.orange,
-            description: "우리 중등부에 처음 발걸음을 옮긴 소중한 친구들입니다.",
+            description: "우리 중등부에 처음 발걸음을 옮긴 소중한 친구들입니다."
           ),
           const SizedBox(height: 24),
         ],
 
         if (promotedList.isNotEmpty) ...[
           _buildNameListSection(
-            "🎉 $filterLabelPrefix 등반 소식",
-            promotedList,
+            "🎉 $filterLabelPrefix 등반 소식", 
+            promotedList, 
             Colors.indigo,
-            description: "4주 출석을 완료하여 정규 학생(A그룹)이 된 친구들입니다!",
+            description: "4주 출석을 완료하여 정규 학생(A그룹)이 된 친구들입니다!"
           ),
           const SizedBox(height: 24),
         ],
 
         _buildNameListSection(
-          "📞 심방 권면 대상 (장기 결석)",
-          absentList,
+          "📞 심방 권면 대상 (장기 결석)", 
+          absentList, 
           Colors.red,
-          description: "해당 기간 동안 출석이 없습니다. 따뜻한 안부 전화가 필요합니다.",
+          description: "해당 기간 동안 출석이 없습니다. 따뜻한 안부 전화가 필요합니다."
         ),
         const SizedBox(height: 24),
 
         _buildSplitNewMemberStatusSection(
-          "🌱 새친구(B그룹) 정착 현황",
-          freshNewFriends,
-          otherBGroup,
+          "🌱 새친구(B그룹) 정착 현황", 
+          freshNewFriends, 
+          otherBGroup
         ),
         const SizedBox(height: 32),
       ],
     );
   }
 
-  Widget _buildNameListSection(
-    String title,
-    List<Map<String, dynamic>> list,
-    Color themeColor, {
-    String? description,
-  }) {
+  Widget _buildNameListSection(String title, List<Map<String, dynamic>> list, Color themeColor, {String? description}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4),
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         if (description != null)
           Padding(
             padding: const EdgeInsets.only(left: 4, top: 2, bottom: 10),
-            child: Text(
-              description,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
+            child: Text(description, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
           ),
         Container(
           width: double.infinity,
@@ -757,75 +544,42 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: themeColor.withOpacity(0.1)),
           ),
-          child: list.isEmpty
-              ? const Text(
-                  "해당하는 학생이 없습니다.",
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                )
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: list
-                      .map(
-                        (m) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: themeColor.withOpacity(0.2),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.02),
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            "${m['name']} (${m['cell']}셀)",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: themeColor.withOpacity(0.8),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
+          child: list.isEmpty 
+            ? const Text("해당하는 학생이 없습니다.", style: TextStyle(color: Colors.grey, fontSize: 13))
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: list.map((m) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: themeColor.withOpacity(0.2)),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 2, offset: const Offset(0, 1))],
+                  ),
+                  child: Text(
+                    "${m['name']} (${m['cell']}셀)",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: themeColor.withOpacity(0.8)),
+                  ),
+                )).toList(),
+              ),
         ),
       ],
     );
   }
 
-  Widget _buildEvangelistSection(
-    String title,
-    List<Map<String, dynamic>> list,
-    Color themeColor, {
-    String? description,
-  }) {
+  Widget _buildEvangelistSection(String title, List<Map<String, dynamic>> list, Color themeColor, {String? description}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4),
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         if (description != null)
           Padding(
             padding: const EdgeInsets.only(left: 4, top: 2, bottom: 10),
-            child: Text(
-              description,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
+            child: Text(description, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
           ),
         Container(
           width: double.infinity,
@@ -835,66 +589,40 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: themeColor.withOpacity(0.1)),
           ),
-          child: list.isEmpty
-              ? const Text(
-                  "등록된 전도 데이터가 없습니다.",
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                )
-              : Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: list
-                      .map(
-                        (m) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: themeColor.withOpacity(0.2),
-                            ),
-                          ),
-                          child: Text(
-                            "${m['evangelist']} (${m['invitedStudents']})",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: themeColor.withOpacity(0.8),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
+          child: list.isEmpty 
+            ? const Text("등록된 전도 데이터가 없습니다.", style: TextStyle(color: Colors.grey, fontSize: 13))
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: list.map((m) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: themeColor.withOpacity(0.2)),
+                  ),
+                  child: Text(
+                    "${m['evangelist']} (${m['invitedStudents']})",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: themeColor.withOpacity(0.8)),
+                  ),
+                )).toList(),
+              ),
         ),
       ],
     );
   }
 
-  Widget _buildSplitNewMemberStatusSection(
-    String title,
-    List<Map<String, dynamic>> freshList,
-    List<Map<String, dynamic>> otherList,
-  ) {
+  Widget _buildSplitNewMemberStatusSection(String title, List<Map<String, dynamic>> freshList, List<Map<String, dynamic>> otherList) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 4),
-          child: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ),
         const Padding(
           padding: EdgeInsets.only(left: 4, bottom: 10),
-          child: Text(
-            "B그룹 학생들의 정착 단계를 보여줍니다. (4주 출석 시 등반)",
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
+          child: Text("B그룹 학생들의 정착 단계를 보여줍니다. (4주 출석 시 등반)", style: TextStyle(fontSize: 12, color: Colors.grey)),
         ),
         Container(
           width: double.infinity,
@@ -909,33 +637,17 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               if (freshList.isEmpty && otherList.isEmpty)
                 const Padding(
                   padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    "현재 관리 중인 새친구가 없습니다.",
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
+                  child: Text("현재 관리 중인 새친구가 없습니다.", style: TextStyle(color: Colors.grey, fontSize: 13)),
                 ),
-
+              
               if (freshList.isNotEmpty) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Row(
                     children: [
-                      const Text(
-                        "📂 금년 신규 등록 새친구",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
+                      const Text("📂 금년 신규 등록 새친구", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.orange)),
                       const SizedBox(width: 8),
-                      Text(
-                        "(role: 새친구)",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.orange.withOpacity(0.6),
-                        ),
-                      ),
+                      Text("(role: 새친구)", style: TextStyle(fontSize: 10, color: Colors.orange.withOpacity(0.6))),
                     ],
                   ),
                 ),
@@ -950,22 +662,9 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Row(
                     children: [
-                      const Text(
-                        "📂 정착 관리 B그룹",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueGrey,
-                        ),
-                      ),
+                      const Text("📂 정착 관리 B그룹", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                       const SizedBox(width: 8),
-                      Text(
-                        "(이미 등록된 B그룹 대상)",
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.blueGrey.withOpacity(0.6),
-                        ),
-                      ),
+                      Text("(이미 등록된 B그룹 대상)", style: TextStyle(fontSize: 10, color: Colors.blueGrey.withOpacity(0.6))),
                     ],
                   ),
                 ),
@@ -983,10 +682,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     double progress = m['p'] / m['t'];
     return ListTile(
       dense: true,
-      title: Text(
-        "${m['name']} (${m['cell']}셀)",
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
+      title: Text("${m['name']} (${m['cell']}셀)", style: const TextStyle(fontWeight: FontWeight.bold)),
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4.0),
         child: ClipRRect(
@@ -1001,65 +697,41 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       ),
       trailing: Text(
         "${m['p']} / ${m['t']}주",
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.orange,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
       ),
     );
   }
 
   Widget _buildMonthlyInsights() {
-    int perfectAttendanceCount = _individualStats.values
-        .where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0)
-        .length;
-
+    int perfectAttendanceCount = _individualStats.values.where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0).length;
+    
     if (_viewType == '누적') {
       String currentYear = DateFormat('yyyy').format(_selectedDate);
-      int totalNewFriendsThisYear = _individualStats.values
-          .where(
-            (m) =>
-                m['role'] == '학생' &&
-                m['firstVisitDate'] != null &&
-                m['firstVisitDate'].toString().startsWith(currentYear),
-          )
-          .length;
-      int promotedThisYear = _individualStats.values
-          .where(
-            (m) =>
-                m['role'] == '학생' &&
-                m['promotedAt'] != null &&
-                m['promotedAt'].toString().startsWith(currentYear),
-          )
-          .length;
-      double settlementRate = totalNewFriendsThisYear > 0
-          ? (promotedThisYear / totalNewFriendsThisYear) * 100
-          : 0;
+      int totalNewFriendsThisYear = _individualStats.values.where((m) => m['role'] == '학생' && m['firstVisitDate'] != null && m['firstVisitDate'].toString().startsWith(currentYear)).length;
+      int promotedThisYear = _individualStats.values.where((m) => m['role'] == '학생' && m['promotedAt'] != null && m['promotedAt'].toString().startsWith(currentYear)).length;
+      double settlementRate = totalNewFriendsThisYear > 0 ? (promotedThisYear / totalNewFriendsThisYear) * 100 : 0;
 
       return Container(
         margin: const EdgeInsets.only(bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "연간 핵심 인사이트 📊",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            const Text("연간 핵심 인사이트 📊", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 12),
             Row(
               children: [
                 _insightCard(
-                  "🥇 전체 개근자",
-                  "$perfectAttendanceCount명",
+                  "🥇 전체 개근자", 
+                  "$perfectAttendanceCount명", 
                   Colors.teal,
-                  info: "올해 100% 출석 학생",
+                  info: "올해 100% 출석 학생"
                 ),
                 const SizedBox(width: 10),
                 _insightCard(
-                  "🌱 정착 성공률",
-                  "${settlementRate.toStringAsFixed(1)}%",
+                  "🌱 정착 성공률", 
+                  "${settlementRate.toStringAsFixed(1)}%", 
                   Colors.indigo,
-                  info: "새친구등록 대비 등반 비율",
+                  info: "새친구등록 대비 등반 비율"
                 ),
               ],
             ),
@@ -1068,42 +740,33 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       );
     }
 
-    var bestWeek = _summaryList.isEmpty
-        ? null
-        : _summaryList.reduce((a, b) {
-            double rateA = a['sT'] > 0 ? a['sP'] / a['sT'] : 0;
-            double rateB = b['sT'] > 0 ? b['sP'] / b['sT'] : 0;
-            return rateA > rateB ? a : b;
-          });
+    var bestWeek = _summaryList.isEmpty ? null : _summaryList.reduce((a, b) {
+      double rateA = a['sT'] > 0 ? a['sP'] / a['sT'] : 0;
+      double rateB = b['sT'] > 0 ? b['sP'] / b['sT'] : 0;
+      return rateA > rateB ? a : b;
+    });
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "이번 달 하이라이트 ✨",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          const Text("이번 달 하이라이트 ✨", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 12),
           Row(
             children: [
               _insightCard(
-                "🏆 이달의 개근상",
-                "$perfectAttendanceCount명",
+                "🏆 이달의 개근상", 
+                "$perfectAttendanceCount명", 
                 Colors.teal,
-                info: "이번 달 모두 출석",
+                info: "이번 달 모두 출석"
               ),
               const SizedBox(width: 10),
               _insightCard(
-                "🔥 베스트 주차",
-                bestWeek != null
-                    ? DateFormat(
-                        'MM/dd',
-                      ).format(DateTime.parse(bestWeek['date']))
-                    : "-",
+                "🔥 베스트 주차", 
+                bestWeek != null ? DateFormat('MM/dd').format(DateTime.parse(bestWeek['date'])) : "-", 
                 Colors.orange,
-                info: "가장 출석률 높았던 주일",
+                info: "가장 출석률 높았던 주일"
               ),
             ],
           ),
@@ -1124,30 +787,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: color.withOpacity(0.9),
-              ),
-            ),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color.withOpacity(0.9))),
             if (info != null) ...[
               const SizedBox(height: 4),
-              Text(
-                info,
-                style: TextStyle(fontSize: 9, color: color.withOpacity(0.7)),
-              ),
-            ],
+              Text(info, style: TextStyle(fontSize: 9, color: color.withOpacity(0.7))),
+            ]
           ],
         ),
       ),
@@ -1158,18 +804,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     var sorted = List.from(_summaryList).reversed.toList();
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blue.shade100),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.blue.shade100)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '출석률 추이',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-          ),
+          const Text('출석률 추이', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
           const SizedBox(height: 20),
           SizedBox(
             height: 120,
@@ -1177,34 +816,15 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: sorted.map((item) {
-                double rate = (item['sT'] ?? 0) > 0
-                    ? (item['sP'] / item['sT'])
-                    : 0;
+                double rate = (item['sT'] ?? 0) > 0 ? (item['sP'] / item['sT']) : 0;
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Text(
-                      '${(rate * 100).toInt()}%',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
+                    Text('${(rate * 100).toInt()}%', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blue)),
                     const SizedBox(height: 4),
-                    Container(
-                      width: 20,
-                      height: (rate * 80) + 5,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade300,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
+                    Container(width: 20, height: (rate * 80) + 5, decoration: BoxDecoration(color: Colors.blue.shade300, borderRadius: BorderRadius.circular(4))),
                     const SizedBox(height: 4),
-                    Text(
-                      item['date'].substring(5),
-                      style: const TextStyle(fontSize: 8, color: Colors.grey),
-                    ),
+                    Text(item['date'].substring(5), style: const TextStyle(fontSize: 8, color: Colors.grey)),
                   ],
                 );
               }).toList(),
@@ -1216,26 +836,14 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildRankingArea(String title, Color mainColor) {
-    var sortedCells = _cellAverages.entries.where((e) => e.key != '교사').toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    var sortedCells = _cellAverages.entries.where((e) => e.key != '교사').toList()..sort((a, b) => b.value.compareTo(a.value));
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: mainColor.withOpacity(0.2)),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: mainColor.withOpacity(0.2))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: mainColor,
-              fontSize: 16,
-            ),
-          ),
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 16)),
           const SizedBox(height: 16),
           ...sortedCells.asMap().entries.map((entry) {
             int rank = entry.key + 1;
@@ -1244,42 +852,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 10,
-                    backgroundColor: rank == 1
-                        ? Colors.amber
-                        : Colors.grey.shade200,
-                    child: Text(
-                      '$rank',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: rank == 1 ? Colors.white : Colors.grey,
-                      ),
-                    ),
-                  ),
+                  CircleAvatar(radius: 10, backgroundColor: rank == 1 ? Colors.amber : Colors.grey.shade200, child: Text('$rank', style: TextStyle(fontSize: 10, color: rank == 1 ? Colors.white : Colors.grey))),
                   const SizedBox(width: 10),
-                  Text(
-                    '${e.key}셀',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  Text('${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  Text(
-                    '${(e.value * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: mainColor,
-                    ),
-                  ),
+                  Text('${(e.value * 100).toStringAsFixed(1)}%', style: TextStyle(fontWeight: FontWeight.bold, color: mainColor)),
                   const SizedBox(width: 10),
-                  SizedBox(
-                    width: 60,
-                    child: LinearProgressIndicator(
-                      value: e.value,
-                      color: mainColor,
-                      backgroundColor: mainColor.withOpacity(0.1),
-                      minHeight: 4,
-                    ),
-                  ),
+                  SizedBox(width: 60, child: LinearProgressIndicator(value: e.value, color: mainColor, backgroundColor: mainColor.withOpacity(0.1), minHeight: 4)),
                 ],
               ),
             );
@@ -1290,21 +869,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildIndividualList() {
-    var students = _individualStats.values
-        .where((m) => m['role'] == '학생')
-        .toList();
+    var students = _individualStats.values.where((m) => m['role'] == '학생').toList();
     if (_individualSortMode == '랭킹순') {
-      students.sort(
-        (a, b) => (b['p'] / (b['t'] > 0 ? b['t'] : 1)).compareTo(
-          a['p'] / (a['t'] > 0 ? a['t'] : 1),
-        ),
-      );
+      students.sort((a, b) => (b['p'] / (b['t'] > 0 ? b['t'] : 1)).compareTo(a['p'] / (a['t'] > 0 ? a['t'] : 1)));
     } else {
-      students.sort(
-        (a, b) => (int.tryParse(a['cell'] ?? '99') ?? 99).compareTo(
-          int.tryParse(b['cell'] ?? '99') ?? 99,
-        ),
-      );
+      students.sort((a, b) => (int.tryParse(a['cell'] ?? '99') ?? 99).compareTo(int.tryParse(b['cell'] ?? '99') ?? 99));
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -1316,18 +885,9 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: CircleAvatar(child: Text(m['name'][0])),
-            title: Text(
-              m['name'],
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text("${m['cell']}셀 | ${m['group']}그룹"),
-            trailing: Text(
-              "${(rate * 100).toInt()}% (${m['p']}/${m['t']}회)",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: rate >= 0.8 ? Colors.teal : Colors.orange,
-              ),
-            ),
+            trailing: Text("${(rate * 100).toInt()}% (${m['p']}/${m['t']}회)", style: TextStyle(fontWeight: FontWeight.bold, color: rate >= 0.8 ? Colors.teal : Colors.orange)),
           ),
         );
       },
@@ -1340,31 +900,19 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       children: [
         _buildDashboardArea(),
         ..._cellStats.entries.map((e) {
-          bool isT = e.key == '교사';
+          bool isT = e.key == '교사'; 
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             child: ExpansionTile(
               initiallyExpanded: true,
-              title: Text(
-                isT ? '👨‍🏫 교사 전체' : '${e.key}셀',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              trailing: Text(
-                '${e.value['present']} / ${isT ? '' : '재적 '}${e.value['total']}명',
-                style: TextStyle(
-                  color: isT ? Colors.orange : Colors.teal,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
+              title: Text(isT ? '👨‍🏫 교사 전체' : '${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              trailing: Text('${e.value['present']} / ${isT ? '' : '재적 '}${e.value['total']}명', style: TextStyle(color: isT ? Colors.orange : Colors.teal, fontWeight: FontWeight.bold, fontSize: 14)),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                   child: _buildMemberGrid(
                     Map<String, dynamic>.from(e.value['records']),
+                    isT,
                   ),
                 ),
               ],
@@ -1376,56 +924,22 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildDashboardArea() {
-    var sorted = _cellStats.entries.where((e) => e.key != '교사').toList()
-      ..sort(
-        (a, b) =>
-            (b.value['present'] / (b.value['total'] > 0 ? b.value['total'] : 1))
-                .compareTo(
-                  a.value['present'] /
-                      (a.value['total'] > 0 ? a.value['total'] : 1),
-                ),
-      );
+    var sorted = _cellStats.entries.where((e) => e.key != '교사').toList()..sort((a, b) => (b.value['present'] / (b.value['total'] > 0 ? b.value['total'] : 1)).compareTo(a.value['present'] / (a.value['total'] > 0 ? a.value['total'] : 1)));
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: sorted.map((e) {
-          double rate = e.value['total'] > 0
-              ? e.value['present'] / e.value['total']
-              : 0;
+          double rate = e.value['total'] > 0 ? e.value['present'] / e.value['total'] : 0;
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    '${e.key}셀',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: LinearProgressIndicator(
-                    value: rate,
-                    color: Colors.teal,
-                    minHeight: 8,
-                  ),
-                ),
+                SizedBox(width: 40, child: Text('${e.key}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                Expanded(child: LinearProgressIndicator(value: rate, color: Colors.teal, minHeight: 8)),
                 const SizedBox(width: 10),
-                Text(
-                  '${(rate * 100).toInt()}%',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('${(rate * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
           );
@@ -1434,13 +948,48 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  Widget _buildMemberGrid(Map<String, dynamic> records) {
-    var sorted = records.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+  Widget _buildMemberGrid(Map<String, dynamic> records, bool isTeacher) {
+    if (isTeacher) {
+      return _buildNameWrap(records.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    }
+
+    var groupA = records.entries.where((e) => e.value['group'] == 'A').toList()..sort((a, b) => a.key.compareTo(b.key));
+    var groupB = records.entries.where((e) => e.value['group'] == 'B').toList()..sort((a, b) => a.key.compareTo(b.key));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (groupA.isNotEmpty) ...[
+          const Row(
+            children: [
+              Icon(Icons.people_alt, size: 13, color: Colors.teal),
+              SizedBox(width: 4),
+              Text("정규 학생 (A그룹)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.teal)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildNameWrap(groupA),
+        ],
+        if (groupA.isNotEmpty && groupB.isNotEmpty) const SizedBox(height: 16),
+        if (groupB.isNotEmpty) ...[
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome, size: 13, color: Colors.orange),
+              SizedBox(width: 4),
+              Text("새친구 (B그룹)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildNameWrap(groupB),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildNameWrap(List<MapEntry<String, dynamic>> entries) {
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: sorted.map((e) {
+      spacing: 6, runSpacing: 6,
+      children: entries.map((e) {
         bool isP = e.value['status'] == '출석';
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -1463,54 +1012,32 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Future<void> _selectDate() async {
     if (_viewType == '월별') {
-      int tempYear = _selectedDate.year;
-      int tempMonth = _selectedDate.month;
+      int tempYear = _selectedDate.year; int tempMonth = _selectedDate.month;
       final pickedDate = await showDialog<DateTime>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text(
-            '조회 월 선택',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+          title: const Text('조회 월 선택', style: TextStyle(fontWeight: FontWeight.bold)),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButton<int>(
-                  value: tempYear,
-                  isExpanded: true,
-                  items: List.generate(5, (i) => 2024 + i)
-                      .map(
-                        (y) => DropdownMenuItem(value: y, child: Text('$y년')),
-                      )
-                      .toList(),
+                  value: tempYear, isExpanded: true,
+                  items: List.generate(5, (i) => 2024 + i).map((y) => DropdownMenuItem(value: y, child: Text('$y년'))).toList(),
                   onChanged: (y) => tempYear = y!,
                 ),
                 const SizedBox(height: 10),
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                  spacing: 10, runSpacing: 10,
                   children: List.generate(12, (i) => i + 1).map((m) {
                     bool isCurrent = tempMonth == m;
                     return InkWell(
-                      onTap: () =>
-                          Navigator.pop(context, DateTime(tempYear, m, 1)),
+                      onTap: () => Navigator.pop(context, DateTime(tempYear, m, 1)),
                       child: Container(
-                        width: 50,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: isCurrent ? Colors.teal : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '$m월',
-                          style: TextStyle(
-                            color: isCurrent ? Colors.white : Colors.black87,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        width: 50, height: 40, alignment: Alignment.center,
+                        decoration: BoxDecoration(color: isCurrent ? Colors.teal : Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+                        child: Text('$m월', style: TextStyle(color: isCurrent ? Colors.white : Colors.black87, fontWeight: FontWeight.bold)),
                       ),
                     );
                   }).toList(),
@@ -1518,35 +1045,16 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-          ],
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소'))],
         ),
       );
-      if (pickedDate != null) {
-        setState(() {
-          _selectedDate = pickedDate;
-          _fetchStats();
-        });
-      }
+      if (pickedDate != null) { setState(() { _selectedDate = pickedDate; _fetchStats(); }); }
     } else {
       final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: _selectedDate,
-        firstDate: DateTime(2024, 1, 1),
-        lastDate: DateTime.now(),
-        locale: const Locale('ko', 'KR'),
+        context: context, initialDate: _selectedDate, firstDate: DateTime(2024, 1, 1), lastDate: DateTime.now(), locale: const Locale('ko', 'KR'),
         selectableDayPredicate: (d) => d.weekday == DateTime.sunday,
       );
-      if (picked != null) {
-        setState(() {
-          _selectedDate = picked;
-          _fetchStats();
-        });
-      }
+      if (picked != null) { setState(() { _selectedDate = picked; _fetchStats(); }); }
     }
   }
 }
