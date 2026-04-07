@@ -253,6 +253,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       String group = data['group'] ?? (data['isRegular'] == true ? 'A' : 'B');
       String dbRole = data['role'] ?? '학생';
       String promotedAt = data['promotedAt'] ?? '';
+      String firstVisitDate = data['firstVisitDate'] ?? '';
+      String evangelist = data['evangelist'] ?? '';
 
       indv[name] = {
         'name': name,
@@ -263,6 +265,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         'group': group,
         'dbRole': dbRole,
         'promotedAt': promotedAt,
+        'firstVisitDate': firstVisitDate,
+        'evangelist': evangelist,
       };
       if (!cellHistory.containsKey(cellId)) cellHistory[cellId] = [];
     }
@@ -588,10 +592,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (_viewType == '월별') _buildMonthlyInsights(),
+        if (_viewType == '월별' || _viewType == '누적') _buildMonthlyInsights(),
         _buildTrendChart(),
         const SizedBox(height: 24),
-        _buildRankingArea('반별 평균 출석률 🏆', Colors.orange),
+        _buildRankingArea(
+          _viewType == '누적' ? '연간 평균 출석률 순위 🏆' : '반별 평균 출석률 🏆',
+          Colors.orange,
+        ),
         const SizedBox(height: 24),
         _buildPastoralSections(),
       ],
@@ -599,40 +606,120 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildPastoralSections() {
+    String filterLabelPrefix = _viewType == '누적' ? '연간' : '이달의';
+    String yearStr = DateFormat('yyyy').format(_selectedDate);
+    String monthStr = DateFormat('yyyy-MM').format(_selectedDate);
+    String dateFilter = _viewType == '누적' ? yearStr : monthStr;
+
     var perfectList = _individualStats.values
         .where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0)
+        .toList();
+
+    var promotedList = _individualStats.values
+        .where(
+          (m) =>
+              m['role'] == '학생' &&
+              m['promotedAt'] != null &&
+              m['promotedAt'].toString().startsWith(dateFilter),
+        )
+        .toList();
+
+    var firstVisitList = _individualStats.values
+        .where(
+          (m) =>
+              m['role'] == '학생' &&
+              m['firstVisitDate'] != null &&
+              m['firstVisitDate'].toString().startsWith(dateFilter),
+        )
         .toList();
 
     var absentList = _individualStats.values
         .where((m) => m['role'] == '학생' && m['p'] == 0 && m['t'] > 0)
         .toList();
 
-    var newMemberList = _individualStats.values
+    var freshNewFriends = _individualStats.values
         .where((m) => m['role'] == '학생' && m['dbRole'] == "새친구" && m['t'] > 0)
         .toList();
 
-    String currentMonthStr = DateFormat('yyyy-MM').format(_selectedDate);
-    var promotedList = _individualStats.values
+    var otherBGroup = _individualStats.values
         .where(
           (m) =>
               m['role'] == '학생' &&
-              m['promotedAt'] != null &&
-              m['promotedAt'].toString().startsWith(currentMonthStr),
+              m['group'] == "B" &&
+              m['dbRole'] != "새친구" &&
+              m['t'] > 0,
+        )
+        .toList();
+
+    // 전도자 집계 로직
+    Map<String, List<String>> evangelistMap = {};
+    for (var m in firstVisitList) {
+      String evName = m['evangelist']?.toString().trim() ?? '';
+      // ✅ "자진"인 경우는 전도자 명단에서 제외
+      if (evName.isNotEmpty && evName != "자진") {
+        if (!evangelistMap.containsKey(evName)) evangelistMap[evName] = [];
+        evangelistMap[evName]!.add(m['name']);
+      }
+    }
+
+    var evangelistList = evangelistMap.entries
+        .map(
+          (e) => {'evangelist': e.key, 'invitedStudents': e.value.join(', ')},
         )
         .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildNameListSection("🏆 이달의 개근자 명단", perfectList, Colors.teal),
+        _buildNameListSection(
+          "$filterLabelPrefix 개근자 명단 🏆",
+          perfectList,
+          Colors.teal,
+          description: "선택된 기간 동안 한 번도 빠지지 않은 자랑스러운 얼굴들입니다.",
+        ),
         const SizedBox(height: 24),
-        _buildNameListSection("📞 심방 권면 대상 (올결석)", absentList, Colors.red),
+
+        _buildEvangelistSection(
+          "📢 $filterLabelPrefix 전도자",
+          evangelistList,
+          Colors.purple,
+          description: "새친구를 인도하여 하나님 나라를 확장한 귀한 분들입니다. (자진 제외)",
+        ),
         const SizedBox(height: 24),
-        if (promotedList.isNotEmpty) ...[
-          _buildNameListSection("🎉 이달의 등반 소식", promotedList, Colors.indigo),
+
+        if (firstVisitList.isNotEmpty) ...[
+          _buildNameListSection(
+            "🎁 $filterLabelPrefix 새친구 방문",
+            firstVisitList,
+            Colors.orange,
+            description: "우리 중등부에 처음 발걸음을 옮긴 소중한 친구들입니다.",
+          ),
           const SizedBox(height: 24),
         ],
-        _buildNewMemberStatusSection(newMemberList),
+
+        if (promotedList.isNotEmpty) ...[
+          _buildNameListSection(
+            "🎉 $filterLabelPrefix 등반 소식",
+            promotedList,
+            Colors.indigo,
+            description: "4주 출석을 완료하여 정규 학생(A그룹)이 된 친구들입니다!",
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        _buildNameListSection(
+          "📞 심방 권면 대상 (장기 결석)",
+          absentList,
+          Colors.red,
+          description: "해당 기간 동안 출석이 없습니다. 따뜻한 안부 전화가 필요합니다.",
+        ),
+        const SizedBox(height: 24),
+
+        _buildSplitNewMemberStatusSection(
+          "🌱 새친구(B그룹) 정착 현황",
+          freshNewFriends,
+          otherBGroup,
+        ),
         const SizedBox(height: 32),
       ],
     );
@@ -641,18 +728,27 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget _buildNameListSection(
     String title,
     List<Map<String, dynamic>> list,
-    Color themeColor,
-  ) {
+    Color themeColor, {
+    String? description,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          padding: const EdgeInsets.only(left: 4),
           child: Text(
             title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
+        if (description != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 2, bottom: 10),
+            child: Text(
+              description,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
@@ -707,65 +803,209 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  Widget _buildNewMemberStatusSection(List<Map<String, dynamic>> list) {
+  Widget _buildEvangelistSection(
+    String title,
+    List<Map<String, dynamic>> list,
+    Color themeColor, {
+    String? description,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
           child: Text(
-            "🌱 새친구 정착 현황",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        if (description != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 2, bottom: 10),
+            child: Text(
+              description,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: themeColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: themeColor.withOpacity(0.1)),
+          ),
+          child: list.isEmpty
+              ? const Text(
+                  "등록된 전도 데이터가 없습니다.",
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: list
+                      .map(
+                        (m) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: themeColor.withOpacity(0.2),
+                            ),
+                          ),
+                          child: Text(
+                            "${m['evangelist']} (${m['invitedStudents']})",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: themeColor.withOpacity(0.8),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSplitNewMemberStatusSection(
+    String title,
+    List<Map<String, dynamic>> freshList,
+    List<Map<String, dynamic>> otherList,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 10),
+          child: Text(
+            "B그룹 학생들의 정착 단계를 보여줍니다. (4주 출석 시 등반)",
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ),
         Container(
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.orange.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.orange.withOpacity(0.1)),
           ),
-          child: list.isEmpty
-              ? const Padding(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (freshList.isEmpty && otherList.isEmpty)
+                const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Text(
-                    "현재 등록된 새친구가 없습니다.",
+                    "현재 관리 중인 새친구가 없습니다.",
                     style: TextStyle(color: Colors.grey, fontSize: 13),
                   ),
-                )
-              : Column(
-                  children: list.map((m) {
-                    double progress = m['p'] / m['t'];
-                    return ListTile(
-                      dense: true,
-                      title: Text(
-                        "${m['name']} (${m['cell']}셀)",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: Colors.orange.withOpacity(0.1),
-                            color: Colors.orange,
-                            minHeight: 6,
-                          ),
-                        ),
-                      ),
-                      trailing: Text(
-                        // ✅ '회' 단위를 '주' 단위로 변경
-                        "${m['p']} / ${m['t']}주",
-                        style: const TextStyle(
+                ),
+
+              if (freshList.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      const Text(
+                        "📂 금년 신규 등록 새친구",
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.orange,
                         ),
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(width: 8),
+                      Text(
+                        "(role: 새친구)",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.orange.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                ...freshList.map((m) => _buildStatusTile(m)),
+              ],
+
+              if (freshList.isNotEmpty && otherList.isNotEmpty)
+                const Divider(height: 1, indent: 16, endIndent: 16),
+
+              if (otherList.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      const Text(
+                        "📂 정착 관리 B그룹",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "(이미 등록된 B그룹 대상)",
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.blueGrey.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ...otherList.map((m) => _buildStatusTile(m)),
+              ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildStatusTile(Map<String, dynamic> m) {
+    double progress = m['p'] / m['t'];
+    return ListTile(
+      dense: true,
+      title: Text(
+        "${m['name']} (${m['cell']}셀)",
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4.0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.orange.withOpacity(0.1),
+            color: Colors.orange,
+            minHeight: 6,
+          ),
+        ),
+      ),
+      trailing: Text(
+        "${m['p']} / ${m['t']}주",
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.orange,
+        ),
+      ),
     );
   }
 
@@ -773,6 +1013,61 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     int perfectAttendanceCount = _individualStats.values
         .where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0)
         .length;
+
+    if (_viewType == '누적') {
+      String currentYear = DateFormat('yyyy').format(_selectedDate);
+      int totalNewFriendsThisYear = _individualStats.values
+          .where(
+            (m) =>
+                m['role'] == '학생' &&
+                m['firstVisitDate'] != null &&
+                m['firstVisitDate'].toString().startsWith(currentYear),
+          )
+          .length;
+      int promotedThisYear = _individualStats.values
+          .where(
+            (m) =>
+                m['role'] == '학생' &&
+                m['promotedAt'] != null &&
+                m['promotedAt'].toString().startsWith(currentYear),
+          )
+          .length;
+      double settlementRate = totalNewFriendsThisYear > 0
+          ? (promotedThisYear / totalNewFriendsThisYear) * 100
+          : 0;
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "연간 핵심 인사이트 📊",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _insightCard(
+                  "🥇 전체 개근자",
+                  "$perfectAttendanceCount명",
+                  Colors.teal,
+                  info: "올해 100% 출석 학생",
+                ),
+                const SizedBox(width: 10),
+                _insightCard(
+                  "🌱 정착 성공률",
+                  "${settlementRate.toStringAsFixed(1)}%",
+                  Colors.indigo,
+                  info: "새친구등록 대비 등반 비율",
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     var bestWeek = _summaryList.isEmpty
         ? null
         : _summaryList.reduce((a, b) {
@@ -797,6 +1092,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                 "🏆 이달의 개근상",
                 "$perfectAttendanceCount명",
                 Colors.teal,
+                info: "이번 달 모두 출석",
               ),
               const SizedBox(width: 10),
               _insightCard(
@@ -807,6 +1103,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                       ).format(DateTime.parse(bestWeek['date']))
                     : "-",
                 Colors.orange,
+                info: "가장 출석률 높았던 주일",
               ),
             ],
           ),
@@ -815,7 +1112,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  Widget _insightCard(String label, String value, Color color) {
+  Widget _insightCard(String label, String value, Color color, {String? info}) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -835,7 +1132,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                 color: color,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               value,
               style: TextStyle(
@@ -844,6 +1141,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
                 color: color.withOpacity(0.9),
               ),
             ),
+            if (info != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                info,
+                style: TextStyle(fontSize: 9, color: color.withOpacity(0.7)),
+              ),
+            ],
           ],
         ),
       ),
