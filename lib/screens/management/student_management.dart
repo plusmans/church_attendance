@@ -37,7 +37,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    // 렌더링 전 데이터 로딩 안정성 확보
     try {
       final sSnap = await FirebaseFirestore.instance
           .collection('students')
@@ -109,10 +108,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     return DateFormat('yyyy-MM-dd').format(lastSunday);
   }
 
-  // ✅ 등반 처리: role은 변경하지 않고 기존 값(새친구) 유지
   Future<void> _promoteStudent(Map<String, dynamic> s) async {
     int attendance = s['attendanceCount'] ?? 0;
     String autoDate = _getThisSunday();
+    final messenger = ScaffoldMessenger.of(context);
 
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -167,16 +166,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               'promotionDate': autoDate,
               'updatedAt': FieldValue.serverTimestamp(),
             });
-        await _loadInitialData(); // 데이터 새로고침
-        if (mounted)
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("${s['name']} 학생이 $autoDate부로 등반되었습니다! 🎉")),
-          );
+        await _loadInitialData();
+        messenger.showSnackBar(
+          SnackBar(content: Text("${s['name']} 학생이 $autoDate부로 등반되었습니다! 🎉")),
+        );
       } catch (e) {
-        if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("오류 발생: $e")));
+        messenger.showSnackBar(SnackBar(content: Text("오류 발생: $e")));
       }
     }
   }
@@ -230,7 +225,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     ].contains(widget.teacherRole);
 
     return DefaultTabController(
-      key: ValueKey(isSuperAdmin), // 탭 개수 변경 시 강제 리빌드로 에러 방지
+      key: ValueKey(isSuperAdmin),
       length: isSuperAdmin ? 2 : 1,
       child: Scaffold(
         backgroundColor: Colors.grey.shade50,
@@ -241,7 +236,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             unselectedLabelColor: Colors.grey,
             indicatorColor: Colors.indigo,
             tabs: [
-              const Tab(text: "전체 명단"),
+              const Tab(text: "학생 명단"),
               if (isSuperAdmin) const Tab(text: "등반/행정 관리"),
             ],
           ),
@@ -258,7 +253,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // --- 탭 1: 전체 명단 (role 기반 구분 및 셀 번호 표시) ---
   Widget _buildListViewSection() {
     List<Map<String, dynamic>> filteredList = _allStudents.where((s) {
       if (_selectedCell == '전체') return true;
@@ -270,7 +264,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     List<Map<String, dynamic>> groupA = filteredList
         .where((s) => s['group'] != 'B')
         .toList();
-    // ✅ role 필드('새친구' vs '학생')로 구분
     List<Map<String, dynamic>> groupBNew = filteredList
         .where((s) => s['group'] == 'B' && s['role'] == '새친구')
         .toList();
@@ -306,17 +299,14 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // --- 탭 2: 등반 관리 (role 기반 구분) ---
   Widget _buildAdminActionSection() {
     List<Map<String, dynamic>> groupBTotal = _allStudents
         .where((s) => s['group'] == 'B')
         .toList();
 
-    // 등반 대기: B그룹 중 role이 '새친구'이면서 출석 4회 이상
     List<Map<String, dynamic>> readyToPromote = groupBTotal
         .where((s) => (s['attendanceCount'] ?? 0) >= 4 && s['role'] == '새친구')
         .toList();
-    // B그룹 관리: 그 외 모든 B그룹 인원
     List<Map<String, dynamic>> managementTarget = groupBTotal
         .where((s) => !readyToPromote.contains(s))
         .toList();
@@ -399,7 +389,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
           child: Center(
             child: Text(
-              "${s['cell']}셀", // ✅ "1" -> "1셀" 수정
+              "${s['cell']}셀",
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
@@ -623,7 +613,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // ✅ 한 줄 명단: 소속 셀 배지 추가
   Widget _buildStudentOneLineRow(Map<String, dynamic> s) {
     bool isMale = s['gender'] == '남자';
     String phone = s['phone'] ?? '-';
@@ -631,6 +620,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String pPhone = (s['parentPhone'] ?? '-').toString();
     bool isNewFriend = s['role'] == '새친구';
     String cellBadge = "${s['cell']}셀";
+
+    final bool isCrisis =
+        (s['attendanceCount'] ?? 0) <= 1 || s['isCrisis'] == true;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
@@ -640,7 +632,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       child: Row(
         children: [
           SizedBox(
-            width: 110,
+            width: 145,
             child: Row(
               children: [
                 Icon(
@@ -648,18 +640,47 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   color: isMale ? Colors.blue : Colors.pink,
                   size: 14,
                 ),
+                const SizedBox(width: 2),
+                Text(
+                  isMale ? "남" : "여",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isMale ? Colors.blue : Colors.pink,
+                  ),
+                ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
-                    s['name'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: isNewFriend
-                          ? Colors.orange.shade800
-                          : Colors.black,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          s['name'],
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isNewFriend
+                                ? Colors.orange.shade800
+                                : Colors.black,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isCrisis)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 3),
+                          child: Text(
+                            "🔴위기",
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 2),
@@ -685,7 +706,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
           ),
           Expanded(
-            flex: 4,
+            flex: 2,
             child: GestureDetector(
               onTap: () => _makeCall(phone),
               child: Text(
@@ -695,18 +716,18 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   color: Colors.blue,
                   decoration: TextDecoration.underline,
                 ),
-                textAlign: TextAlign.center,
+                textAlign: TextAlign.left,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
           Expanded(
-            flex: 6,
+            flex: 5,
             child: GestureDetector(
               onTap: () => _makeCall(pPhone),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   const Icon(
                     Icons.people_outline,
@@ -722,7 +743,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         color: Colors.orange,
                         fontWeight: FontWeight.w500,
                       ),
-                      textAlign: TextAlign.right,
+                      textAlign: TextAlign.left,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -730,15 +751,26 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.assignment_ind_outlined,
-              size: 20,
-              color: Colors.indigo,
+          GestureDetector(
+            onTap: () => _showStudentDetails(s),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.assignment_ind_outlined,
+                  size: 18,
+                  color: Colors.indigo,
+                ),
+                const Text(
+                  "상세",
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: Colors.indigo,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            onPressed: () => _showStudentDetails(s),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -850,23 +882,77 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   ),
                   const SizedBox(height: 32),
                   _detailGroup("📍 기본 인적 사항", [
-                    _detailItem("📱 본인전화", s['phone'], isPhone: true),
-                    _detailItem("🎂 생년월일", s['birthDate']),
-                    _detailItem("🏫 중학교", s['school']),
-                    _detailItem("🏠 거주주소", s['address']),
+                    _detailItem(
+                      "📱 본인전화",
+                      s['phone'],
+                      icon: Icons.phone_android,
+                      isPhone: true,
+                    ),
+                    _detailItem(
+                      "🎂 생년월일",
+                      s['birthDate'],
+                      icon: Icons.cake_rounded,
+                    ),
+                    _detailItem(
+                      "🏫 소속학교",
+                      s['school'],
+                      icon: Icons.school_rounded,
+                    ),
+                    _detailItem(
+                      "🏠 거주주소",
+                      s['address'],
+                      icon: Icons.home_rounded,
+                    ),
                   ]),
                   _detailGroup("👨‍👩‍👧 가족 및 보호자 정보", [
-                    _detailItem("👤 학부모 성함", s['parentName']),
-                    _detailItem("📞 학부모 전화", s['parentPhone'], isPhone: true),
-                    _detailItem("🎖️ 학부모 직분", s['parentRole']),
-                    _detailItem("⛪ 출석교회", s['churchName']),
-                    _detailItem("🧬 형제관계", s['siblings']),
+                    _detailItem(
+                      "👤 보호자명",
+                      s['parentName'],
+                      icon: Icons.person_rounded,
+                    ),
+                    _detailItem(
+                      "📞 보호자번호",
+                      s['parentPhone'],
+                      icon: Icons.phone_rounded,
+                      isPhone: true,
+                    ),
+                    _detailItem(
+                      "🎖️ 보호자직분",
+                      s['parentRole'],
+                      icon: Icons.workspace_premium_rounded,
+                    ),
+                    _detailItem(
+                      "⛪ 출석교회",
+                      s['churchName'],
+                      icon: Icons.church_rounded,
+                    ),
+                    _detailItem(
+                      "🧬 형제관계",
+                      s['siblings'],
+                      icon: Icons.family_restroom_rounded,
+                    ),
                   ]),
                   _detailGroup("🌱 신앙 및 성향", [
-                    _detailItem("🛡️ 세례상태", s['baptismStatus']),
-                    _detailItem("🧠 MBTI", s['mbti']),
-                    _detailItem("🤝 교회친구", s['churchFriends']),
-                    _detailItem("📊 누적출석", "${s['attendanceCount'] ?? 0}회"),
+                    _detailItem(
+                      "🛡️ 세례상태",
+                      s['baptismStatus'],
+                      icon: Icons.verified_user_rounded,
+                    ),
+                    _detailItem(
+                      "🧠 MBTI",
+                      s['mbti'],
+                      icon: Icons.psychology_rounded,
+                    ),
+                    _detailItem(
+                      "🤝 교회친구",
+                      s['churchFriends'],
+                      icon: Icons.group_rounded,
+                    ),
+                    _detailItem(
+                      "📊 누적출석",
+                      "${s['attendanceCount'] ?? 0}회",
+                      icon: Icons.bar_chart_rounded,
+                    ),
                   ]),
                   if (s['remarks'] != null)
                     _detailGroup("📝 관리 및 비고", [
@@ -876,9 +962,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       ),
                     ]),
                   const SizedBox(height: 24),
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("닫기"),
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text("닫기"),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 40),
                 ],
@@ -891,33 +984,65 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   void _showEditDialog(Map<String, dynamic> s) {
-    final nameController = TextEditingController(text: s['name']);
-    final phoneController = TextEditingController(text: s['phone']);
-    final schoolController = TextEditingController(text: s['school']);
-    final addressController = TextEditingController(text: s['address']);
-    final parentNameController = TextEditingController(text: s['parentName']);
-    final parentPhoneController = TextEditingController(text: s['parentPhone']);
-    final parentRoleController = TextEditingController(text: s['parentRole']);
-    final churchNameController = TextEditingController(text: s['churchName']);
-    final mbtiController = TextEditingController(text: s['mbti']);
-    final siblingsController = TextEditingController(text: s['siblings']);
-    final friendsController = TextEditingController(text: s['churchFriends']);
-    final remarksController = TextEditingController(text: s['remarks']);
+    // 💡 [개선] 다이얼로그 외부의 안정적인 messenger 캡처
+    final messenger = ScaffoldMessenger.of(context);
+
+    final nameController = TextEditingController(
+      text: s['name']?.toString() ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: s['phone']?.toString() ?? '',
+    );
+    final schoolController = TextEditingController(
+      text: s['school']?.toString() ?? '',
+    );
+    final addressController = TextEditingController(
+      text: s['address']?.toString() ?? '',
+    );
+    final parentNameController = TextEditingController(
+      text: s['parentName']?.toString() ?? '',
+    );
+    final parentPhoneController = TextEditingController(
+      text: s['parentPhone']?.toString() ?? '',
+    );
+    final parentRoleController = TextEditingController(
+      text: s['parentRole']?.toString() ?? '',
+    );
+    final churchNameController = TextEditingController(
+      text: s['churchName']?.toString() ?? '',
+    );
+    final mbtiController = TextEditingController(
+      text: s['mbti']?.toString() ?? '',
+    );
+    final siblingsController = TextEditingController(
+      text: s['siblings']?.toString() ?? '',
+    );
+    final friendsController = TextEditingController(
+      text: s['churchFriends']?.toString() ?? '',
+    );
+    final remarksController = TextEditingController(
+      text: s['remarks']?.toString() ?? '',
+    );
 
     final List<String> genderOptions = ['남자', '여자'];
-    final List<String> roleOptions = ['학생', '새친구']; // ✅ 역할 목록
+    final List<String> roleOptions = ['학생', '새친구'];
     final List<String> baptismOptions = ['모름', '학습', '세례', '입교', '해당없음'];
 
-    String currentGender = s['gender'] ?? '남자';
-    String currentRole = s['role'] ?? '학생';
-    String currentBaptism = s['baptismStatus'] ?? '해당없음';
+    String currentGender = genderOptions.contains(s['gender'])
+        ? s['gender']
+        : '남자';
+    String currentRole = roleOptions.contains(s['role']) ? s['role'] : '학생';
+    String currentBaptism = baptismOptions.contains(s['baptismStatus'])
+        ? s['baptismStatus']
+        : '해당없음';
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogCtx) => StatefulBuilder(
+        // dialogCtx로 이름 변경하여 메인 context와 분리
+        builder: (stfCtx, setDialogState) => AlertDialog(
           title: Text(
-            "${s['name']} 정보 수정",
+            "${s['name'] ?? '학생'} 정보 수정",
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           content: SizedBox(
@@ -934,15 +1059,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     genderOptions,
                     (val) => setDialogState(() => currentGender = val!),
                   ),
-
-                  // ✅ 역할 선택 (학생/새친구)
                   _dropdownField(
                     "역할 (학생/새친구)",
                     currentRole,
                     roleOptions,
                     (val) => setDialogState(() => currentRole = val!),
                   ),
-
                   _editField("학교", schoolController),
                   _editField("주소", addressController),
                   const Divider(height: 32),
@@ -967,12 +1089,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(stfCtx),
               child: const Text("취소"),
             ),
             ElevatedButton(
               onPressed: () async {
                 try {
+                  // 1. 데이터 업데이트
                   await FirebaseFirestore.instance
                       .collection('students')
                       .doc(s['docId'])
@@ -994,16 +1117,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         'remarks': remarksController.text,
                         'updatedAt': FieldValue.serverTimestamp(),
                       });
+
+                  // 💡 [핵심 해결] context를 직접 쓰지 않고 mounted 체크 후 안정적인 변수 사용
                   if (!mounted) return;
-                  Navigator.pop(context);
+
+                  // 2. 팝업 닫기 (stfCtx 사용)
+                  Navigator.pop(stfCtx);
+
+                  // 3. 메인 데이터 새로고침
                   await _loadInitialData();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text("저장되었습니다.")));
+
+                  // 4. 성공 메시지 (미리 캡처한 messenger 사용)
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text("저장되었습니다.")),
+                  );
                 } catch (e) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text("오류: $e")));
+                  messenger.showSnackBar(SnackBar(content: Text("오류: $e")));
                 }
               },
               child: const Text("저장"),
@@ -1091,22 +1220,36 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  Widget _detailItem(String label, dynamic value, {bool isPhone = false}) {
+  Widget _detailItem(
+    String label,
+    dynamic value, {
+    IconData? icon,
+    bool isPhone = false,
+  }) {
     String val = (value == null || value.toString().isEmpty || value == "-")
         ? "정보 없음"
         : value.toString();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: Colors.indigo.shade400),
+            const SizedBox(width: 8),
+          ],
           SizedBox(
-            width: 95,
+            width: 85,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.grey, fontSize: 14),
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
               onTap: isPhone && val != "정보 없음" ? () => _makeCall(val) : null,
@@ -1154,9 +1297,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     try {
       final String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
       final Uri url = Uri.parse('tel:$cleanNumber');
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      }
+      if (await canLaunchUrl(url)) await launchUrl(url);
     } catch (e) {
       debugPrint("전화 걸기 오류: $e");
     }
