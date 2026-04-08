@@ -8,12 +8,14 @@ class HomeNavigation extends StatefulWidget {
   final String teacherName;
   final String cell;
   final String role;
+  final String grade; // ✅ 교사의 담당 학년 정보
 
   const HomeNavigation({
     super.key,
     required this.teacherName,
     required this.cell,
     required this.role,
+    this.grade = '1학년', // ✅ 기본값을 부여하여 main.dart의 에러를 해결합니다.
   });
 
   @override
@@ -45,8 +47,12 @@ class _HomeNavigationState extends State<HomeNavigation> {
           });
         },
       ),
-      AttendanceInputScreen(teacherCell: defaultCell),
-      // ✅ 수정됨: 권한 판단을 위해 필요한 정보 3가지를 전달합니다.
+      // 출석 입력 화면에 역할과 학년 정보를 전달합니다.
+      AttendanceInputScreen(
+        teacherCell: defaultCell,
+        teacherRole: widget.role,
+        teacherGrade: widget.grade,
+      ),
       StudentManagementScreen(
         teacherName: widget.teacherName,
         teacherCell: widget.cell,
@@ -76,9 +82,15 @@ class _HomeNavigationState extends State<HomeNavigation> {
         widget.role == '개발자' ||
         widget.role == '부장' ||
         widget.role == '강도사';
+    
+    // 학년 담당자 확인 로직
+    bool isGradeAdmin = widget.role.contains('학년담당');
+    
     String displayRole = isSuperAdmin
         ? '👑 시스템 관리자'
-        : '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})';
+        : isGradeAdmin 
+            ? '⭐ ${widget.role}' 
+            : '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})';
 
     return Scaffold(
       appBar: AppBar(
