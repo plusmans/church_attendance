@@ -40,7 +40,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
     super.initState();
     _currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
 
-    // ✅ 'admin' 또는 '개발자' 직분도 최고 관리자 권한을 부여하도록 수정됨
     _isAdmin =
         widget.role == '강도사' ||
         widget.role == '부장' ||
@@ -259,7 +258,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
     }
   }
 
-  // 💡 [추가] 긴급 기도 요청 삭제 기능
   Future<void> _deleteUrgentPrayer(String docId) async {
     try {
       await FirebaseFirestore.instance
@@ -352,6 +350,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 borderRadius: pw.BorderRadius.circular(5),
               ),
               child: pw.Column(
+                // ✅ pw 접두어 추가
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: _commonControllers
                     .map(
@@ -408,6 +407,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 12),
                 child: pw.Column(
+                  // ✅ pw 접두어 추가
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
@@ -462,13 +462,32 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _buildMonthSelector(),
-                      IconButton(
+                      TextButton.icon(
+                        onPressed: _generateAndPrintPdf,
                         icon: const Icon(
                           Icons.picture_as_pdf,
                           color: Colors.redAccent,
+                          size: 18,
                         ),
-                        tooltip: 'PDF로 내보내기',
-                        onPressed: _generateAndPrintPdf,
+                        label: const Text(
+                          '기도제목 PDF 출력',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.red.shade50,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Colors.red.shade100),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -615,7 +634,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 const SizedBox(height: 8),
                 ...docs.map((d) {
                   var data = d.data() as Map<String, dynamic>;
-                  // 💡 본인이 작성했거나 관리자인 경우 삭제 버튼 노출
                   bool canDelete =
                       _isAdmin || data['authorName'] == widget.teacherName;
 
