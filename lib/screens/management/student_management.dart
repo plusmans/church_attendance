@@ -75,7 +75,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       'admin',
       '개발자',
     ].contains(widget.teacherRole);
-
     if (isSuperAdmin) {
       _availableCells = ['전체', ...List.generate(10, (i) => (i + 1).toString())];
       if (['강도사', '부장'].contains(widget.teacherRole)) {
@@ -101,6 +100,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     }
   }
 
+  // ✅ 이번 주 주일 날짜 구하기 (첫 방문일 자동 설정용)
   String _getThisSunday() {
     DateTime now = DateTime.now();
     int difference = now.weekday % 7;
@@ -108,9 +108,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     return DateFormat('yyyy-MM-dd').format(lastSunday);
   }
 
+  String _getToday() => DateFormat('yyyy-MM-dd').format(DateTime.now());
+
   Future<void> _promoteStudent(Map<String, dynamic> s) async {
     int attendance = s['attendanceCount'] ?? 0;
-    String autoDate = _getThisSunday();
+    String autoDate = _getToday();
     final messenger = ScaffoldMessenger.of(context);
 
     bool? confirm = await showDialog<bool>(
@@ -125,7 +127,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             Text("현재 출석: $attendance회"),
             const SizedBox(height: 10),
             Text(
-              "등반 주일: $autoDate",
+              "등반 일자: $autoDate",
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.blue,
@@ -133,7 +135,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
             const SizedBox(height: 10),
             const Text(
-              "해당 학생을 정규 리스트(A그룹)로 이동하시겠습니까?\n(역할은 기존 대로 유지됩니다.)",
+              "해당 학생을 정규 리스트(A그룹)로 이동하시겠습니까?",
               style: TextStyle(fontSize: 13),
             ),
           ],
@@ -163,56 +165,17 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             .update({
               'group': 'A',
               'isRegular': true,
-              'promotionDate': autoDate,
+              'promotedAt': autoDate,
               'updatedAt': FieldValue.serverTimestamp(),
             });
         await _loadInitialData();
         messenger.showSnackBar(
-          SnackBar(content: Text("${s['name']} 학생이 $autoDate부로 등반되었습니다! 🎉")),
+          SnackBar(content: Text("${s['name']} 학생이 등반되었습니다!")),
         );
       } catch (e) {
         messenger.showSnackBar(SnackBar(content: Text("오류 발생: $e")));
       }
     }
-  }
-
-  Map<String, int>? _parseBirthDate(dynamic birth) {
-    if (birth == null) return null;
-    String b = birth.toString();
-    RegExp type1 = RegExp(r'(\d{1,2})월\s*(\d{1,2})일');
-    RegExp type2 = RegExp(r'\d{2}\.(\d{1,2})\.(\d{1,2})');
-    var match1 = type1.firstMatch(b);
-    if (match1 != null)
-      return {
-        'month': int.tryParse(match1.group(1) ?? '') ?? 0,
-        'day': int.tryParse(match1.group(2) ?? '') ?? 0,
-      };
-    var match2 = type2.firstMatch(b);
-    if (match2 != null)
-      return {
-        'month': int.tryParse(match2.group(1) ?? '') ?? 0,
-        'day': int.tryParse(match2.group(2) ?? '') ?? 0,
-      };
-    return null;
-  }
-
-  List<Map<String, dynamic>> _getBirthdayPeople() {
-    List<Map<String, dynamic>> results = [];
-    void check(List<Map<String, dynamic>> list, String type) {
-      for (var item in list) {
-        var parsed = _parseBirthDate(item['birthDate']);
-        if (parsed != null && parsed['month'] == _selectedBirthMonth) {
-          results.add({...item, 'type': type, 'birthDay': parsed['day']});
-        }
-      }
-    }
-
-    check(_allStudents, '학생');
-    check(_allTeachers, '교사');
-    results.sort(
-      (a, b) => (a['birthDay'] as int).compareTo(b['birthDay'] as int),
-    );
-    return results;
   }
 
   @override
@@ -223,7 +186,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       'admin',
       '개발자',
     ].contains(widget.teacherRole);
-
     return DefaultTabController(
       key: ValueKey(isSuperAdmin),
       length: isSuperAdmin ? 2 : 1,
@@ -249,6 +211,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   if (isSuperAdmin) _buildAdminActionSection(),
                 ],
               ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _showAddNewFriendDialog,
+          backgroundColor: Colors.orange,
+          icon: const Icon(Icons.person_add_alt_1_rounded, color: Colors.white),
+          label: const Text(
+            "새친구 등록",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
     );
   }
@@ -291,7 +262,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 _buildGroupHeader("💎 정규 명단 (A그룹)", Colors.indigo),
                 ...groupA.map((s) => _buildStudentOneLineRow(s)),
               ],
-              const SizedBox(height: 80),
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -303,7 +274,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     List<Map<String, dynamic>> groupBTotal = _allStudents
         .where((s) => s['group'] == 'B')
         .toList();
-
     List<Map<String, dynamic>> readyToPromote = groupBTotal
         .where((s) => (s['attendanceCount'] ?? 0) >= 4 && s['role'] == '새친구')
         .toList();
@@ -368,7 +338,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   Widget _buildPromotionCard(Map<String, dynamic> s, {required bool isReady}) {
     int count = s['attendanceCount'] ?? 0;
     bool isNew = s['role'] == '새친구';
-
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
@@ -613,6 +582,45 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
+  List<Map<String, dynamic>> _getBirthdayPeople() {
+    List<Map<String, dynamic>> results = [];
+    void check(List<Map<String, dynamic>> list, String type) {
+      for (var item in list) {
+        var parsed = _parseBirthDate(item['birthDate']);
+        if (parsed != null && parsed['month'] == _selectedBirthMonth) {
+          results.add({...item, 'type': type, 'birthDay': parsed['day']});
+        }
+      }
+    }
+
+    check(_allStudents, '학생');
+    check(_allTeachers, '교사');
+    results.sort(
+      (a, b) => (a['birthDay'] as int).compareTo(b['birthDay'] as int),
+    );
+    return results;
+  }
+
+  Map<String, int>? _parseBirthDate(dynamic birth) {
+    if (birth == null) return null;
+    String b = birth.toString();
+    RegExp type1 = RegExp(r'(\d{1,2})월\s*(\d{1,2})일');
+    RegExp type2 = RegExp(r'(\d{4})-(\d{1,2})-(\d{1,2})');
+    var match1 = type1.firstMatch(b);
+    if (match1 != null)
+      return {
+        'month': int.tryParse(match1.group(1) ?? '') ?? 0,
+        'day': int.tryParse(match1.group(2) ?? '') ?? 0,
+      };
+    var match2 = type2.firstMatch(b);
+    if (match2 != null)
+      return {
+        'month': int.tryParse(match2.group(2) ?? '') ?? 0,
+        'day': int.tryParse(match2.group(3) ?? '') ?? 0,
+      };
+    return null;
+  }
+
   Widget _buildStudentOneLineRow(Map<String, dynamic> s) {
     bool isMale = s['gender'] == '남자';
     String phone = s['phone'] ?? '-';
@@ -620,7 +628,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String pPhone = (s['parentPhone'] ?? '-').toString();
     bool isNewFriend = s['role'] == '새친구';
     String cellBadge = "${s['cell']}셀";
-
     final bool isCrisis =
         (s['attendanceCount'] ?? 0) <= 1 || s['isCrisis'] == true;
 
@@ -753,15 +760,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
           GestureDetector(
             onTap: () => _showStudentDetails(s),
-            child: Column(
+            child: const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.assignment_ind_outlined,
                   size: 18,
                   color: Colors.indigo,
                 ),
-                const Text(
+                Text(
                   "상세",
                   style: TextStyle(
                     fontSize: 8,
@@ -881,6 +888,39 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+                  _detailGroup("📅 신앙 관리 현황", [
+                    _detailItem(
+                      "📅 첫 방문일",
+                      s['firstVisitDate'],
+                      icon: Icons.calendar_today_rounded,
+                    ),
+                    _detailItem(
+                      "👣 신앙경험",
+                      s['churchExperience'],
+                      icon: Icons.history_edu_rounded,
+                    ),
+                    _detailItem(
+                      "🛡️ 세례상태",
+                      s['baptismStatus'] ??
+                          (s['isBaptized'] == true ? '세례' : '미세례'),
+                      icon: Icons.verified_user_rounded,
+                    ),
+                    _detailItem(
+                      "📢 인도자",
+                      s['evangelist'],
+                      icon: Icons.campaign_rounded,
+                    ),
+                    _detailItem(
+                      "⛪ 출석교회",
+                      s['churchName'],
+                      icon: Icons.church_rounded,
+                    ),
+                    _detailItem(
+                      "📊 누적출석",
+                      "${s['attendanceCount'] ?? 0}회",
+                      icon: Icons.bar_chart_rounded,
+                    ),
+                  ]),
                   _detailGroup("📍 기본 인적 사항", [
                     _detailItem(
                       "📱 본인전화",
@@ -903,6 +943,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       s['address'],
                       icon: Icons.home_rounded,
                     ),
+                    _detailItem(
+                      "🧠 MBTI",
+                      s['mbti'],
+                      icon: Icons.psychology_rounded,
+                    ),
                   ]),
                   _detailGroup("👨‍👩‍👧 가족 및 보호자 정보", [
                     _detailItem(
@@ -917,47 +962,20 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       isPhone: true,
                     ),
                     _detailItem(
-                      "🎖️ 보호자직분",
-                      s['parentRole'],
-                      icon: Icons.workspace_premium_rounded,
-                    ),
-                    _detailItem(
-                      "⛪ 출석교회",
-                      s['churchName'],
-                      icon: Icons.church_rounded,
-                    ),
-                    _detailItem(
                       "🧬 형제관계",
                       s['siblings'],
                       icon: Icons.family_restroom_rounded,
-                    ),
-                  ]),
-                  _detailGroup("🌱 신앙 및 성향", [
-                    _detailItem(
-                      "🛡️ 세례상태",
-                      s['baptismStatus'],
-                      icon: Icons.verified_user_rounded,
-                    ),
-                    _detailItem(
-                      "🧠 MBTI",
-                      s['mbti'],
-                      icon: Icons.psychology_rounded,
                     ),
                     _detailItem(
                       "🤝 교회친구",
                       s['churchFriends'],
                       icon: Icons.group_rounded,
                     ),
-                    _detailItem(
-                      "📊 누적출석",
-                      "${s['attendanceCount'] ?? 0}회",
-                      icon: Icons.bar_chart_rounded,
-                    ),
                   ]),
-                  if (s['remarks'] != null)
+                  if (s['notes'] != null || s['remarks'] != null)
                     _detailGroup("📝 관리 및 비고", [
                       Text(
-                        s['remarks'] ?? "",
+                        s['notes'] ?? s['remarks'] ?? "",
                         style: const TextStyle(fontSize: 14, height: 1.5),
                       ),
                     ]),
@@ -983,15 +1001,210 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  void _showEditDialog(Map<String, dynamic> s) {
-    // 💡 [개선] 다이얼로그 외부의 안정적인 messenger 캡처
+  // ✅ [수정] 부장님 요청에 따른 DB 구조 최적화 (출석 0회, 첫 방문일 자동 계산)
+  void _showAddNewFriendDialog() {
     final messenger = ScaffoldMessenger.of(context);
+    final String currentSunday = _getThisSunday(); // ✅ 이번 주 주일 날짜
 
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final birthDateController = TextEditingController();
+    final schoolController = TextEditingController();
+    final addressController = TextEditingController(text: '미입력');
+    final firstVisitDateController = TextEditingController(
+      text: currentSunday,
+    ); // ✅ 자동 설정
+    final evangelistController = TextEditingController();
+    final churchNameController = TextEditingController(text: '성문교회');
+    final churchFriendsController = TextEditingController(text: '미입력');
+    final parentNameController = TextEditingController();
+    final parentPhoneController = TextEditingController(text: '미입력');
+    final mbtiController = TextEditingController(text: '미입력');
+    final siblingsController = TextEditingController(text: '미입력');
+    final notesController = TextEditingController();
+
+    final List<String> genderOptions = ['남자', '여자'];
+    final List<String> gradeOptions = ['1학년', '2학년', '3학년'];
+    final List<String> cellOptions = List.generate(
+      10,
+      (i) => (i + 1).toString(),
+    );
+    final List<String> churchExpOptions = ['유', '무'];
+    final List<String> baptismOptions = ['모름', '학습', '세례', '입교', '해당없음'];
+
+    String currentGender = '남자';
+    String currentGrade = '1학년';
+    String currentCell = (_selectedCell == null || _selectedCell == '전체')
+        ? '1'
+        : _selectedCell!;
+    String currentChurchExp = '유';
+    String currentBaptism = '해당없음';
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (stfCtx, setDialogState) => AlertDialog(
+          title: const Text(
+            "새친구 신규 등록",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: SizedBox(
+            width: MediaQuery.of(context).size.width * 0.9,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _sectionHeader("💎 기본 정보 (필수)"),
+                  _editField("학생 이름 (필수)", nameController),
+                  _editField("본인 전화", phoneController),
+                  _dropdownField(
+                    "성별",
+                    currentGender,
+                    genderOptions,
+                    (val) => setDialogState(() => currentGender = val!),
+                  ),
+                  _dropdownField(
+                    "학년",
+                    currentGrade,
+                    gradeOptions,
+                    (val) => setDialogState(() => currentGrade = val!),
+                  ),
+                  _dropdownField(
+                    "배정 셀",
+                    currentCell,
+                    cellOptions,
+                    (val) => setDialogState(() => currentCell = val!),
+                  ),
+
+                  _sectionHeader("👣 신앙 정보"),
+                  _editField("첫 방문일 (주일 기준)", firstVisitDateController),
+                  _editField("인도자 (누가 데려왔나요?)", evangelistController),
+                  _dropdownField(
+                    "신앙경험",
+                    currentChurchExp,
+                    churchExpOptions,
+                    (val) => setDialogState(() => currentChurchExp = val!),
+                  ),
+                  _editField("이전 교회 이름", churchNameController),
+                  _dropdownField(
+                    "세례 상태",
+                    currentBaptism,
+                    baptismOptions,
+                    (val) => setDialogState(() => currentBaptism = val!),
+                  ),
+
+                  _sectionHeader("📍 생활 및 가족"),
+                  _editField("생년월일 (예: 2011-05-04)", birthDateController),
+                  _editField("소속 학교", schoolController),
+                  _editField("거주 주소", addressController),
+                  _editField("보호자 성함 (모/부 등)", parentNameController),
+                  _editField("보호자 연락처", parentPhoneController),
+                  _editField("MBTI", mbtiController),
+                  _editField("형제관계", siblingsController),
+                  _editField("교회 내 친구", churchFriendsController),
+                  _editField("특이사항 (메모)", notesController, maxLines: 3),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(stfCtx),
+              child: const Text("취소"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                String name = nameController.text.trim();
+                if (name.isEmpty) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text("이름을 입력해주세요.")),
+                  );
+                  return;
+                }
+                try {
+                  // ✅ Firestore 문서 생성 (기존 파일들과 동일한 컬렉션 및 필드 구조)
+                  await FirebaseFirestore.instance.collection('students').add({
+                    'name': name,
+                    'phone': phoneController.text.trim(),
+                    'gender': currentGender,
+                    'grade': currentGrade,
+                    'cell': currentCell,
+                    'group': 'B',
+                    'role': '새친구',
+                    'attendanceCount': 0, // ✅ 부장님 요청: 기본 0으로 저장
+                    'firstVisitDate': firstVisitDateController.text
+                        .trim(), // ✅ 등록 주간 주일로 설정
+                    'evangelist': evangelistController.text.trim().isEmpty
+                        ? "미입력"
+                        : evangelistController.text.trim(),
+                    'churchExperience': currentChurchExp,
+                    'churchName': churchNameController.text.trim().isEmpty
+                        ? "성문교회"
+                        : churchNameController.text.trim(),
+                    'isBaptized': ['세례', '입교'].contains(currentBaptism),
+                    'baptismStatus': currentBaptism,
+                    'birthDate': birthDateController.text.trim().isEmpty
+                        ? "미입력"
+                        : birthDateController.text.trim(),
+                    'school': schoolController.text.trim().isEmpty
+                        ? "미입력"
+                        : schoolController.text.trim(),
+                    'address': addressController.text.trim(),
+                    'parentName': parentNameController.text.trim().isEmpty
+                        ? "미입력"
+                        : parentNameController.text.trim(),
+                    'parentPhone': parentPhoneController.text.trim(),
+                    'mbti': mbtiController.text.trim(),
+                    'siblings': siblingsController.text.trim(),
+                    'churchFriends': churchFriendsController.text.trim(),
+                    'notes': notesController.text.trim(),
+                    'promotedAt': '-',
+                    'isRegular': false,
+                    'isNewFriend': true,
+                    'createdAt': FieldValue.serverTimestamp(),
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                  if (!mounted) return;
+                  Navigator.pop(stfCtx);
+                  await _loadInitialData();
+                  messenger.showSnackBar(
+                    SnackBar(content: Text("$name 새친구가 등록되었습니다! 🎉")),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(content: Text("등록 실패: $e")));
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("등록하기"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(Map<String, dynamic> s) {
+    final messenger = ScaffoldMessenger.of(context);
     final nameController = TextEditingController(
       text: s['name']?.toString() ?? '',
     );
     final phoneController = TextEditingController(
       text: s['phone']?.toString() ?? '',
+    );
+    final firstVisitDateController = TextEditingController(
+      text: s['firstVisitDate']?.toString() ?? '',
+    );
+    final evangelistController = TextEditingController(
+      text: s['evangelist']?.toString() ?? '',
+    );
+    final churchNameController = TextEditingController(
+      text: s['churchName']?.toString() ?? '',
+    );
+    final birthDateController = TextEditingController(
+      text: s['birthDate']?.toString() ?? '',
     );
     final schoolController = TextEditingController(
       text: s['school']?.toString() ?? '',
@@ -1005,28 +1218,23 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     final parentPhoneController = TextEditingController(
       text: s['parentPhone']?.toString() ?? '',
     );
-    final parentRoleController = TextEditingController(
-      text: s['parentRole']?.toString() ?? '',
-    );
-    final churchNameController = TextEditingController(
-      text: s['churchName']?.toString() ?? '',
-    );
     final mbtiController = TextEditingController(
       text: s['mbti']?.toString() ?? '',
     );
     final siblingsController = TextEditingController(
       text: s['siblings']?.toString() ?? '',
     );
-    final friendsController = TextEditingController(
+    final churchFriendsController = TextEditingController(
       text: s['churchFriends']?.toString() ?? '',
     );
-    final remarksController = TextEditingController(
-      text: s['remarks']?.toString() ?? '',
+    final notesController = TextEditingController(
+      text: (s['notes'] ?? s['remarks'])?.toString() ?? '',
     );
 
     final List<String> genderOptions = ['남자', '여자'];
     final List<String> roleOptions = ['학생', '새친구'];
     final List<String> baptismOptions = ['모름', '학습', '세례', '입교', '해당없음'];
+    final List<String> churchExpOptions = ['유', '무'];
 
     String currentGender = genderOptions.contains(s['gender'])
         ? s['gender']
@@ -1035,11 +1243,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String currentBaptism = baptismOptions.contains(s['baptismStatus'])
         ? s['baptismStatus']
         : '해당없음';
+    String currentChurchExp = churchExpOptions.contains(s['churchExperience'])
+        ? s['churchExperience']
+        : '유';
 
     showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
-        // dialogCtx로 이름 변경하여 메인 context와 분리
         builder: (stfCtx, setDialogState) => AlertDialog(
           title: Text(
             "${s['name'] ?? '학생'} 정보 수정",
@@ -1060,19 +1270,25 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     (val) => setDialogState(() => currentGender = val!),
                   ),
                   _dropdownField(
-                    "역할 (학생/새친구)",
+                    "역할",
                     currentRole,
                     roleOptions,
                     (val) => setDialogState(() => currentRole = val!),
                   ),
+                  _editField("첫 방문일", firstVisitDateController),
+                  _editField("인도자", evangelistController),
+                  _dropdownField(
+                    "신앙경험",
+                    currentChurchExp,
+                    churchExpOptions,
+                    (val) => setDialogState(() => currentChurchExp = val!),
+                  ),
                   _editField("학교", schoolController),
                   _editField("주소", addressController),
                   const Divider(height: 32),
-                  _editField("학부모 성함", parentNameController),
-                  _editField("학부모 전화", parentPhoneController),
-                  _editField("학부모 직분", parentRoleController),
-                  _editField("출석 교회", churchNameController),
-                  const Divider(height: 32),
+                  _editField("보호자 성함", parentNameController),
+                  _editField("보호자 전화", parentPhoneController),
+                  _editField("이전 교회", churchNameController),
                   _dropdownField(
                     "세례 상태",
                     currentBaptism,
@@ -1081,8 +1297,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                   ),
                   _editField("MBTI", mbtiController),
                   _editField("형제관계", siblingsController),
-                  _editField("친한친구", friendsController),
-                  _editField("비고", remarksController, maxLines: 3),
+                  _editField("교회친구", churchFriendsController),
+                  _editField("비고(메모)", notesController, maxLines: 3),
                 ],
               ),
             ),
@@ -1095,39 +1311,33 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ElevatedButton(
               onPressed: () async {
                 try {
-                  // 1. 데이터 업데이트
                   await FirebaseFirestore.instance
                       .collection('students')
                       .doc(s['docId'])
                       .update({
-                        'name': nameController.text,
-                        'phone': phoneController.text,
+                        'name': nameController.text.trim(),
+                        'phone': phoneController.text.trim(),
                         'gender': currentGender,
                         'role': currentRole,
-                        'school': schoolController.text,
-                        'address': addressController.text,
-                        'parentName': parentNameController.text,
-                        'parentPhone': parentPhoneController.text,
-                        'parentRole': parentRoleController.text,
-                        'churchName': churchNameController.text,
+                        'firstVisitDate': firstVisitDateController.text.trim(),
+                        'evangelist': evangelistController.text.trim(),
+                        'churchExperience': currentChurchExp,
+                        'school': schoolController.text.trim(),
+                        'address': addressController.text.trim(),
+                        'parentName': parentNameController.text.trim(),
+                        'parentPhone': parentPhoneController.text.trim(),
+                        'churchName': churchNameController.text.trim(),
+                        'isBaptized': ['세례', '입교'].contains(currentBaptism),
                         'baptismStatus': currentBaptism,
-                        'mbti': mbtiController.text,
-                        'siblings': siblingsController.text,
-                        'churchFriends': friendsController.text,
-                        'remarks': remarksController.text,
+                        'mbti': mbtiController.text.trim(),
+                        'siblings': siblingsController.text.trim(),
+                        'churchFriends': churchFriendsController.text.trim(),
+                        'notes': notesController.text.trim(),
                         'updatedAt': FieldValue.serverTimestamp(),
                       });
-
-                  // 💡 [핵심 해결] context를 직접 쓰지 않고 mounted 체크 후 안정적인 변수 사용
                   if (!mounted) return;
-
-                  // 2. 팝업 닫기 (stfCtx 사용)
                   Navigator.pop(stfCtx);
-
-                  // 3. 메인 데이터 새로고침
                   await _loadInitialData();
-
-                  // 4. 성공 메시지 (미리 캡처한 messenger 사용)
                   messenger.showSnackBar(
                     const SnackBar(content: Text("저장되었습니다.")),
                   );
@@ -1139,6 +1349,25 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.indigo,
+            ),
+          ),
+          const Expanded(child: Divider(indent: 10, thickness: 1)),
+        ],
       ),
     );
   }
