@@ -350,7 +350,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 borderRadius: pw.BorderRadius.circular(5),
               ),
               child: pw.Column(
-                // ✅ pw 접두어 추가
+                // ✅ 문법 에러 수정: pw.CrossAxisAlignment.start 사용
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: _commonControllers
                     .map(
@@ -407,7 +407,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 12),
                 child: pw.Column(
-                  // ✅ pw 접두어 추가
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
@@ -454,7 +453,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -467,46 +466,51 @@ class _PrayerScreenState extends State<PrayerScreen> {
                         icon: const Icon(
                           Icons.picture_as_pdf,
                           color: Colors.redAccent,
-                          size: 18,
+                          size: 14,
                         ),
                         label: const Text(
-                          '기도제목 PDF 출력',
+                          'PDF 출력',
                           style: TextStyle(
                             color: Colors.redAccent,
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red.shade50,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                            horizontal: 8,
+                            vertical: 4,
                           ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: Colors.red.shade100),
+                            borderRadius: BorderRadius.circular(6),
+                            side: BorderSide(
+                              color: Colors.red.shade100,
+                              width: 0.5,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   _buildCommonArea(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   _buildUrgentInputArea(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   _buildInputTitle(),
                   ..._buildInputFields(),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   _buildSaveButton(),
-                  const SizedBox(height: 30),
-                  const Divider(thickness: 8, color: Color(0xFFF5F5F5)),
                   const SizedBox(height: 20),
+                  const Divider(thickness: 4, color: Color(0xFFF5F5F5)),
+                  const SizedBox(height: 12),
                   Text(
                     '✨ $_currentMonth 선생님들의 기도 제목',
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -523,10 +527,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Widget _buildUrgentInputArea() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.red.shade100),
       ),
       child: Column(
@@ -537,39 +541,45 @@ class _PrayerScreenState extends State<PrayerScreen> {
               const Icon(
                 Icons.notification_important,
                 color: Colors.red,
-                size: 20,
+                size: 16,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Text(
-                '🚨 긴급 기도 요청 (누구나 작성 가능)',
+                '🚨 긴급 기도 요청',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
+                  fontSize: 13,
                   color: Colors.red.shade900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           TextField(
             controller: _urgentController,
             maxLines: null,
-            style: const TextStyle(fontSize: 13),
+            style: const TextStyle(fontSize: 12),
             decoration: InputDecoration(
-              hintText: '환우 소식 등 긴급히 함께 기도할 제목을 입력하세요',
-              hintStyle: TextStyle(color: Colors.red.shade200),
+              hintText: '긴급히 함께 기도할 제목을 입력하세요',
+              hintStyle: TextStyle(color: Colors.red.shade200, fontSize: 11),
               isDense: true,
               border: InputBorder.none,
             ),
           ),
-          const Divider(color: Colors.redAccent, thickness: 0.5),
+          const Divider(color: Colors.redAccent, thickness: 0.5, height: 12),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _isUrgentSaving ? null : _saveUrgentPrayer,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(50, 24),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               child: _isUrgentSaving
                   ? const SizedBox(
-                      width: 15,
-                      height: 15,
+                      width: 12,
+                      height: 12,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.red,
@@ -580,6 +590,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       style: TextStyle(
                         color: Colors.red,
                         fontWeight: FontWeight.bold,
+                        fontSize: 11,
                       ),
                     ),
             ),
@@ -614,11 +625,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
         return SliverToBoxAdapter(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.red.shade100.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,41 +637,38 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 const Text(
                   '🚩 최근 긴급 요청',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Colors.red,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 ...docs.map((d) {
                   var data = d.data() as Map<String, dynamic>;
                   bool canDelete =
                       _isAdmin || data['authorName'] == widget.teacherName;
-
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Text(
-                            '• ${data['content']} (${data['authorName']} ${data['authorRole']})',
+                            '• ${data['content']} (${data['authorName']})',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               color: Colors.black87,
                             ),
                           ),
                         ),
                         if (canDelete)
-                          IconButton(
-                            icon: const Icon(
+                          GestureDetector(
+                            onTap: () => _deleteUrgentPrayer(d.id),
+                            child: const Icon(
                               Icons.close,
                               color: Colors.redAccent,
-                              size: 14,
+                              size: 12,
                             ),
-                            onPressed: () => _deleteUrgentPrayer(d.id),
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
                           ),
                       ],
                     ),
@@ -676,18 +684,26 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Widget _buildMonthSelector() {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.calendar_month, color: Colors.teal, size: 20),
-        const SizedBox(width: 8),
+        const Icon(Icons.calendar_month, color: Colors.teal, size: 16),
+        const SizedBox(width: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: 28,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.teal.shade100),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.teal.shade100, width: 0.5),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _currentMonth,
+              icon: const Icon(Icons.arrow_drop_down, size: 18),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
+              ),
               items: _monthOptions
                   .map(
                     (month) => DropdownMenuItem(
@@ -696,7 +712,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
                         DateFormat(
                           'yyyy년 MM월',
                         ).format(DateTime.parse('$month-01')),
-                        style: const TextStyle(fontSize: 14),
                       ),
                     ),
                   )
@@ -717,10 +732,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildCommonArea() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.teal.shade100),
       ),
       child: Column(
@@ -734,14 +749,15 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   Icon(
                     Icons.auto_awesome,
                     color: Colors.teal.shade700,
-                    size: 20,
+                    size: 16,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     '$_currentMonth 공동 기도제목',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.teal.shade900,
+                      fontSize: 13,
                     ),
                   ),
                 ],
@@ -751,7 +767,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   icon: const Icon(
                     Icons.add_circle,
                     color: Colors.teal,
-                    size: 20,
+                    size: 18,
                   ),
                   onPressed: _addCommonField,
                   constraints: const BoxConstraints(),
@@ -759,26 +775,27 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           if (_isAdmin)
             ..._commonControllers
                 .asMap()
                 .entries
                 .map(
                   (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.only(bottom: 6.0),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: entry.value,
-                            style: const TextStyle(fontSize: 13),
+                            // ✅ 자동 줄바꿈 처리 추가
                             maxLines: null,
                             keyboardType: TextInputType.multiline,
+                            style: const TextStyle(fontSize: 12),
                             decoration: InputDecoration(
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8,
+                                vertical: 4,
                               ),
                               prefixText: '${entry.key + 1}. ',
                               hintText: '공동 기도제목 입력',
@@ -789,9 +806,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
                           icon: const Icon(
                             Icons.remove_circle,
                             color: Colors.redAccent,
-                            size: 18,
+                            size: 16,
                           ),
                           onPressed: () => _removeCommonField(entry.key),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
                       ],
                     ),
@@ -804,25 +823,29 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '${entry.key + 1}. ${_cleanText(entry.value.text)}',
-                  style: TextStyle(fontSize: 13, color: Colors.teal.shade800),
+                  style: TextStyle(fontSize: 12, color: Colors.teal.shade800),
                 ),
               ),
             ),
           if (_isAdmin) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             SizedBox(
               width: double.infinity,
+              height: 30,
               child: ElevatedButton(
                 onPressed: _isCommonSaving ? null : _saveCommonPrayer,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal.shade700,
                   foregroundColor: Colors.white,
-                  visualDensity: VisualDensity.compact,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
                 child: _isCommonSaving
                     ? const SizedBox(
-                        height: 15,
-                        width: 15,
+                        height: 12,
+                        width: 12,
                         child: CircularProgressIndicator(
                           color: Colors.white,
                           strokeWidth: 2,
@@ -830,7 +853,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       )
                     : const Text(
                         '공동 기도제목 업데이트',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 11),
                       ),
               ),
             ),
@@ -846,12 +869,16 @@ class _PrayerScreenState extends State<PrayerScreen> {
       children: [
         const Text(
           '📝 나의 기도제목',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         ),
         TextButton.icon(
           onPressed: _addField,
-          icon: const Icon(Icons.add_circle_outline, size: 20),
-          label: const Text('항목 추가'),
+          icon: const Icon(Icons.add_circle_outline, size: 16),
+          label: const Text('항목 추가', style: TextStyle(fontSize: 11)),
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(60, 30),
+          ),
         ),
       ],
     );
@@ -861,44 +888,45 @@ class _PrayerScreenState extends State<PrayerScreen> {
     return _controllers.asMap().entries.map((entry) {
       int idx = entry.key;
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.only(top: 8),
               child: CircleAvatar(
-                radius: 12,
+                radius: 10,
                 backgroundColor: Colors.teal.shade100,
                 child: Text(
                   '${idx + 1}',
-                  style: const TextStyle(fontSize: 12, color: Colors.teal),
+                  style: const TextStyle(fontSize: 10, color: Colors.teal),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: entry.value,
                 maxLines: null,
-                keyboardType: TextInputType.multiline,
+                style: const TextStyle(fontSize: 13),
                 decoration: const InputDecoration(
                   hintText: '내용을 입력하세요',
                   border: UnderlineInputBorder(),
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  contentPadding: EdgeInsets.symmetric(vertical: 6),
                 ),
               ),
             ),
             if (_controllers.length > 1)
               IconButton(
-                padding: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.only(top: 6),
                 icon: const Icon(
                   Icons.remove_circle_outline,
                   color: Colors.grey,
-                  size: 20,
+                  size: 16,
                 ),
                 onPressed: () => _removeField(idx),
+                constraints: const BoxConstraints(),
               ),
           ],
         ),
@@ -909,20 +937,19 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildSaveButton() {
     return SizedBox(
       width: double.infinity,
+      height: 42,
       child: ElevatedButton(
         onPressed: _isSaving ? null : _savePrayer,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.teal,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: _isSaving
             ? const SizedBox(
-                height: 20,
-                width: 20,
+                height: 18,
+                width: 18,
                 child: CircularProgressIndicator(
                   color: Colors.white,
                   strokeWidth: 2,
@@ -930,7 +957,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
               )
             : const Text(
                 '저장 및 공유하기',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
       ),
     );
@@ -946,14 +973,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
           .collection('prayer_requests')
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError)
-          return const SliverFillRemaining(
-            child: Center(child: Text("데이터 로드 중 오류가 발생했습니다.")),
-          );
         if (!snapshot.hasData)
           return const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator()),
           );
+
         var docs = snapshot.data!.docs
             .where(
               (doc) =>
@@ -961,6 +985,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   _currentMonth,
             )
             .toList();
+
         docs.sort((a, b) {
           var aData = a.data() as Map<String, dynamic>;
           var bData = b.data() as Map<String, dynamic>;
@@ -968,30 +993,36 @@ class _PrayerScreenState extends State<PrayerScreen> {
             aData['updatedAt'] ?? Timestamp.now(),
           );
         });
+
         if (docs.isEmpty)
-          return const SliverFillRemaining(
+          return const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(32.0),
               child: Center(
-                child: Text("등록된 기도제목이 없습니다.", textAlign: TextAlign.center),
+                child: Text(
+                  "등록된 기도제목이 없습니다.",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ),
             ),
           );
+
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             var data = docs[index].data() as Map<String, dynamic>;
             List<dynamic> contents = data['content'] ?? [];
             return Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              padding: const EdgeInsets.all(16),
+              // ✅ 선생님 목록 간의 간격 축소 (8 -> 4)
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ],
                 border: Border.all(color: Colors.grey.shade100),
@@ -1005,31 +1036,29 @@ class _PrayerScreenState extends State<PrayerScreen> {
                         '${index + 1}. ${_cleanName(data['teacherName'] ?? '교사')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: 14,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         data['cell'] ?? '-',
                         style: TextStyle(
                           color: Colors.teal.shade600,
-                          fontSize: 12,
+                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  // ✅ 이름/셀과 내용 사이의 간격 축소 (6 -> 2)
+                  const SizedBox(height: 2),
                   ...contents.asMap().entries.map(
-                    (e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${e.key + 1}. ${_cleanText(e.value.toString())}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black87,
-                          height: 1.4,
-                        ),
+                    (e) => Text(
+                      '${e.key + 1}. ${_cleanText(e.value.toString())}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black87,
+                        height: 1.3,
                       ),
                     ),
                   ),

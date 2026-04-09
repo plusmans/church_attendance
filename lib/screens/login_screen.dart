@@ -9,146 +9,229 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // 📱 전화번호 입력 컨트롤러
+  // 📱 입력 컨트롤러
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false; // 비밀번호 숨김/표시 상태
 
   Future<void> _login() async {
     String phoneNumber = _phoneController.text.trim();
     String password = _passwordController.text.trim();
 
     if (phoneNumber.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('전화번호와 비밀번호를 입력해주세요.')));
+      _showSnackBar('전화번호와 비밀번호를 입력해주세요.');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // 💡 [핵심 수정] 입력받은 전화번호 뒤에 @sungmoon.com을 자동으로 붙입니다.
-      // 만약 사용자가 전체 이메일을 다 쳤을 경우를 대비해 체크 로직을 넣었습니다.
+      // 💡 입력받은 전화번호 뒤에 @sungmoon.com 자동 결합
       String emailFormat = phoneNumber.contains('@')
           ? phoneNumber
           : '$phoneNumber@sungmoon.com';
 
-      // 파이어베이스 로그인 시도
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailFormat,
         password: password,
       );
-
-      // ✅ 성공 시 화면 전환은 main.dart의 StreamBuilder가 처리하므로
-      // 별도의 Navigator 코드는 작성하지 않습니다.
     } on FirebaseAuthException catch (e) {
       String message = '로그인에 실패했습니다.';
       if (e.code == 'user-not-found') {
-        message = '등록되지 않은 사용자(전화번호)입니다.';
+        message = '등록되지 않은 사용자입니다.';
       } else if (e.code == 'wrong-password') {
         message = '비밀번호가 일치하지 않습니다.';
       } else if (e.code == 'invalid-email') {
-        message = '이메일(아이디) 형식이 올바르지 않습니다.';
+        message = '이메일 형식이 올바르지 않습니다.';
       }
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      }
+      _showSnackBar(message);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('오류가 발생했습니다. 다시 시도해주세요.')));
-      }
+      _showSnackBar('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
-      if (mounted)
-        setState(() {
-          _isLoading = false;
-        });
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating, // 모바일에서 보기 편한 플로팅 스타일
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 모바일 화면 크기에 따른 유동적인 디자인을 위한 미디어 쿼리
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.church, size: 80, color: Colors.teal),
-              const SizedBox(height: 20),
-              const Text(
-                '성문교회 중등부 출석부', // 교회 이름을 넣어 보았습니다! 😊
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+      // 모바일 앱 느낌을 주는 부드러운 배경색
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 1. 상단 로고 영역
+                Icon(
+                  Icons.church_rounded,
+                  size: size.height * 0.08,
                   color: Colors.teal,
                 ),
-              ),
-              const SizedBox(height: 40),
-
-              // 📱 전화번호 입력창
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: '전화번호',
-                  hintText: '01012345678',
-                  prefixIcon: const Icon(Icons.phone_android_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  helperText: '숫자만 입력하시면 자동으로 로그인됩니다.',
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // 🔒 비밀번호 입력창
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: '비밀번호',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                const Text(
+                  '성문교회 중등부',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.teal,
+                    letterSpacing: -0.5,
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const Text(
+                  '스마트 출석부 시스템',
+                  style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                ),
+                const SizedBox(height: 40),
 
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                // 2. 로그인 폼 (카드형 디자인)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          '로그인하기',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                  child: Column(
+                    children: [
+                      // 전화번호 입력
+                      TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(
+                          labelText: '전화번호',
+                          hintText: '01012345678',
+                          prefixIcon: const Icon(Icons.phone_android, size: 20),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 비밀번호 입력
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: !_isPasswordVisible,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _login(),
+                        decoration: InputDecoration(
+                          labelText: '비밀번호',
+                          prefixIcon: const Icon(
+                            Icons.lock_outline_rounded,
+                            size: 20,
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              setState(
+                                () => _isPasswordVisible = !_isPasswordVisible,
+                              );
+                            },
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade200),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 32),
+
+                // 3. ✅ 로그인 버튼 (크기 최소화: 너비 50%, 높이 46)
+                SizedBox(
+                  width: size.width * 0.5, // 가로 너비를 화면의 50%로 더 축소
+                  height: 46, // 높이를 50에서 46으로 더 슬림하게 조정
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      elevation: 1, // 그림자 농도 조절
+                      shadowColor: Colors.teal.withOpacity(0.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          23,
+                        ), // 버튼 높이의 절반으로 설정하여 완전한 라운드 형태
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            '로그인하기',
+                            style: TextStyle(
+                              fontSize: 15, // 폰트 크기 살짝 조정
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+                // 4. 하단 도움말
+                Text(
+                  '계정 정보가 기억나지 않으시면\n부장선생님께 문의해주세요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),

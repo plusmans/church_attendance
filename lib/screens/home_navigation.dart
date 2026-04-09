@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'attendance/attendance_status.dart';
 import 'attendance/attendance_input.dart';
@@ -8,14 +9,14 @@ class HomeNavigation extends StatefulWidget {
   final String teacherName;
   final String cell;
   final String role;
-  final String grade; // ✅ 교사의 담당 학년 정보
+  final String grade;
 
   const HomeNavigation({
     super.key,
     required this.teacherName,
     required this.cell,
     required this.role,
-    this.grade = '1학년', // ✅ 기본값을 부여하여 main.dart의 에러를 해결합니다.
+    this.grade = '1학년',
   });
 
   @override
@@ -25,12 +26,22 @@ class HomeNavigation extends StatefulWidget {
 class _HomeNavigationState extends State<HomeNavigation> {
   int _selectedIndex = 1;
   String? _autoSelectedCell;
+  late String _cheerMessage;
+
+  final List<String> _cheerMessages = [
+    "오늘도 사랑으로 축복합니다! 🙏",
+    "선생님의 수고를 응원해요! ✨",
+    "우리 아이들의 소중한 목자님! 🌱",
+    "기쁨이 가득한 하루 되세요! 😊",
+    "기도로 함께하는 동역자입니다! ❤️",
+  ];
 
   late List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
+    _cheerMessage = _cheerMessages[Random().nextInt(_cheerMessages.length)];
     _buildScreens();
   }
 
@@ -47,7 +58,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
           });
         },
       ),
-      // 출석 입력 화면에 역할과 학년 정보를 전달합니다.
       AttendanceInputScreen(
         teacherCell: defaultCell,
         teacherRole: widget.role,
@@ -82,51 +92,79 @@ class _HomeNavigationState extends State<HomeNavigation> {
         widget.role == '개발자' ||
         widget.role == '부장' ||
         widget.role == '강도사';
-    
-    // 학년 담당자 확인 로직
+
     bool isGradeAdmin = widget.role.contains('학년담당');
-    
+
     String displayRole = isSuperAdmin
-        ? '👑 시스템 관리자'
-        : isGradeAdmin 
-            ? '⭐ ${widget.role}' 
-            : '${widget.role} (${widget.cell == '담당' ? '본부' : '${widget.cell}셀'})';
+        ? '관리자'
+        : isGradeAdmin
+        ? widget.role
+        : '${widget.role}(${widget.cell == '담당' ? '학년담당' : '${widget.cell}셀'})';
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 42,
         title: Text(
           appBarTitle,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            letterSpacing: -0.8,
+          ),
         ),
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
+            padding: const EdgeInsets.only(right: 12.0),
             child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${widget.teacherName} ${isSuperAdmin ? '님' : '선생님'}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                    _cheerMessage,
+                    style: TextStyle(
+                      fontSize: 7.5,
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  Text(
-                    displayRole,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isSuperAdmin
-                          ? Colors.yellowAccent
-                          : Colors.white70,
-                      fontWeight: isSuperAdmin
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                    ),
+                  const SizedBox(height: 1),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ✅ [수정] '님' 대신 '사역자님' 표현으로 변경
+                      Text(
+                        '${widget.teacherName} ${isSuperAdmin ? '사역자님' : '교사'}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 3,
+                          vertical: 0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          displayRole,
+                          style: const TextStyle(
+                            fontSize: 7,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -135,37 +173,76 @@ class _HomeNavigationState extends State<HomeNavigation> {
         ],
       ),
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-            if (index != 1) _autoSelectedCell = null;
-            _buildScreens();
-          });
-        },
-        selectedItemColor: themeColor,
-        unselectedItemColor: Colors.grey,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: '출석 현황',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade200, width: 0.5),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.edit_calendar_rounded),
-            label: '출석 입력',
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 46,
+            child: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                  if (index != 1) _autoSelectedCell = null;
+                  _buildScreens();
+                });
+              },
+              selectedItemColor: themeColor,
+              unselectedItemColor: Colors.grey.shade400,
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 9,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 9,
+              ),
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              iconSize: 18,
+              items: [
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 0
+                        ? Icons.bar_chart_rounded
+                        : Icons.bar_chart_outlined,
+                  ),
+                  label: '현황',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 1
+                        ? Icons.edit_calendar_rounded
+                        : Icons.edit_calendar_outlined,
+                  ),
+                  label: '출석',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 2
+                        ? Icons.manage_accounts_rounded
+                        : Icons.manage_accounts_outlined,
+                  ),
+                  label: '관리',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(
+                    _selectedIndex == 3
+                        ? Icons.volunteer_activism
+                        : Icons.volunteer_activism_outlined,
+                  ),
+                  label: '기도',
+                ),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.manage_accounts_rounded),
-            label: '학생 관리',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.volunteer_activism),
-            label: '중보기도',
-          ),
-        ],
+        ),
       ),
     );
   }
