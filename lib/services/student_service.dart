@@ -56,6 +56,8 @@ class StudentService {
       'isRegular': false,
       'attendanceCount': 0, // 기본 출석 횟수는 0회
       'firstVisitDate': firstVisitDate ?? '',
+      'promotedAt': '',
+      'remarks' : '',
       'evangelist': evangelist ?? '미입력',
       'baptismStatus': baptismStatus ?? '해당없음',
       'isBaptized': ['세례', '입교'].contains(baptismStatus),

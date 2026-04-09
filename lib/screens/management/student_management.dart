@@ -1184,6 +1184,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 children: [
                   _editField("이름", nameController),
                   _editField("본인 전화", phoneController),
+                  _editField("생년월일", birthDateController),
                   _dropdownField(
                     "성별",
                     currentGender,
@@ -1241,6 +1242,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                         'gender': currentGender,
                         'role': currentRole,
                         'firstVisitDate': firstVisitDateController.text.trim(),
+                        'birthDate' : birthDateController.text.trim(),
                         'evangelist': evangelistController.text.trim(),
                         'churchExperience': currentChurchExp,
                         'school': schoolController.text.trim(),
