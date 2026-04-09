@@ -1,26 +1,27 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // 💡 추가
+import 'package:firebase_auth/firebase_auth.dart';
 import 'attendance/attendance_status.dart';
 import 'attendance/attendance_input.dart';
 import 'management/student_management.dart';
 import 'prayer/prayer_screen.dart';
-// 💡 만약 ChangePasswordScreen이 별도 파일에 있다면 import가 필요합니다.
+// 💡 필요한 화면들을 임포트합니다.
 import 'change_password_screen.dart';
+import 'teacher_management_screen.dart'; // 💡 교사 관리 화면 임포트
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
   final String cell;
   final String role;
   final String grade;
-  final String docId; // 💡 [추가] Firestore 문서 ID를 받습니다.
+  final String docId;
 
   const HomeNavigation({
     super.key,
     required this.teacherName,
     required this.cell,
     required this.role,
-    required this.docId, // 💡 [추가]
+    required this.docId,
     this.grade = '1학년',
   });
 
@@ -92,6 +93,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
     if (_selectedIndex == 2) appBarTitle = '학생 관리';
     if (_selectedIndex == 3) appBarTitle = '중보기도';
 
+    // 💡 관리자 권한 확인 변수
     bool isSuperAdmin =
         widget.role == 'admin' ||
         widget.role == '개발자' ||
@@ -122,7 +124,26 @@ class _HomeNavigationState extends State<HomeNavigation> {
         elevation: 0,
         centerTitle: false,
         actions: [
-          // 💡 [비밀번호 변경 버튼 추가]
+          // 💡 [추가] 관리자 전용 교사 관리 버튼
+          if (widget.role == 'admin')
+            IconButton(
+              icon: const Icon(
+                Icons.people_alt_rounded,
+                size: 20,
+                color: Colors.white70,
+              ),
+              tooltip: '교사 관리',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TeacherManagementScreen(),
+                  ),
+                );
+              },
+            ),
+
+          // 비밀번호 변경 버튼
           IconButton(
             icon: const Icon(
               Icons.lock_reset_rounded,
@@ -131,10 +152,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
             ),
             tooltip: '비밀번호 변경',
             onPressed: () {
-              // 💡 이전에 작성한 ChangePasswordScreen을 호출합니다.
-              // 만약 해당 클래스가 main.dart에 있다면 Navigator를 통해 이동합니다.
-              // (주의: ChangePasswordScreen 위젯이 정의되어 있어야 합니다.)
-
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -144,11 +161,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
                     isMandatory: false,
                   ),
                 ),
-              );
-
-              // 임시로 스낵바 표시 (클래스 연결 시 위 주석을 해제하세요)
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('비밀번호 변경 화면으로 이동합니다.')),
               );
             },
           ),
