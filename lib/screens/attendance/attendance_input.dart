@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart'; // ✅ 추가: 프레임 콜백용
+import 'package:flutter/scheduler.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../widgets/student_registration_dialog.dart';
@@ -25,7 +25,6 @@ class AttendanceInputScreen extends StatefulWidget {
 class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   bool _isLoading = true;
 
-  // ✅ 모든 필드를 선언 시점에 초기화하여 'LateInitializationError'를 원천 봉쇄합니다.
   DateTime _targetDate = DateTime.now();
   String _currentCell = '1';
 
@@ -50,11 +49,9 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   @override
   void initState() {
     super.initState();
-    // 1. 초기값 설정
     _targetDate = widget.selectedDate ?? _getRecentSunday();
     _currentCell = widget.teacherCell == '담당' ? 'teachers' : widget.teacherCell;
 
-    // 2. ✅ 프레임 렌더링이 완료된 후 데이터를 로드하도록 변경 (Web 엔진 안정성 확보)
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadData();
     });
@@ -164,15 +161,20 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       } else {
         List<String> loadedNames = [];
         Map<String, Map<String, dynamic>> tempAttendanceData = {};
+
+        // ✅ [수정] 교사전체 선택 시 기본 상태를 '출석'으로, 학생일 경우 '결석'으로 설정
+        String defaultStatus = _currentCell == 'teachers' ? '출석' : '결석';
+
         for (var mDoc in masterSnap.docs) {
           Map<String, dynamic> mData = mDoc.data() as Map<String, dynamic>;
           String name = mData['name'] ?? '이름없음';
           loadedNames.add(name);
           String resGroup = _extractGroup(mData);
-          _initialStatusMap[name] = '결석';
+
+          _initialStatusMap[name] = defaultStatus;
           _customReasonControllers[name] = TextEditingController();
           tempAttendanceData[name] = {
-            'status': '결석',
+            'status': defaultStatus,
             'reason': '연락x',
             'customReason': '',
             'gender': mData['gender'] ?? '모름',
@@ -313,7 +315,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // ✅ 중복되는 appBar를 완전히 제거하여 HomeNavigation의 상단바만 보이게 수정함
       body: Column(
         children: [
           _buildTopSelector(mainColor),
@@ -406,38 +407,24 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                                       ],
                                     ),
                                   ),
-                                  _miniStatusToggle(name, isP, mainColor),
+                                  _miniStatusToggle(
+                                    name,
+                                    isP,
+                                    mainColor,
+                                    isTMode,
+                                  ),
                                 ],
                               ),
                               if (!isP) ...[
                                 const SizedBox(height: 6),
-                                _buildReasonDropdown(name, data),
-                                if (data['reason'] == '기타') ...[
-                                  const SizedBox(height: 6),
-                                  SizedBox(
-                                    height: 32,
-                                    child: TextField(
-                                      controller:
-                                          _customReasonControllers[name],
-                                      decoration: InputDecoration(
-                                        hintText: "상세 사유 입력",
-                                        isDense: true,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 6,
-                                            ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                      ),
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ),
+                                if (isTMode)
+                                  _buildCustomReasonField(name)
+                                else ...[
+                                  _buildReasonDropdown(name, data),
+                                  if (data['reason'] == '기타') ...[
+                                    const SizedBox(height: 6),
+                                    _buildCustomReasonField(name),
+                                  ],
                                 ],
                               ],
                             ],
@@ -448,6 +435,27 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomReasonField(String name) {
+    return SizedBox(
+      height: 32,
+      child: TextField(
+        controller: _customReasonControllers[name],
+        decoration: InputDecoration(
+          hintText: "결석 사유 직접 입력",
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 6,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+        style: const TextStyle(fontSize: 12),
       ),
     );
   }
@@ -513,18 +521,29 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     );
   }
 
-  Widget _miniStatusToggle(String name, bool isP, Color mainColor) {
+  Widget _miniStatusToggle(
+    String name,
+    bool isP,
+    Color mainColor,
+    bool isTMode,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _miniButton(name, '출석', isP, mainColor),
+        _miniButton(name, '출석', isP, mainColor, isTMode),
         const SizedBox(width: 3),
-        _miniButton(name, '결석', !isP, Colors.red.shade400),
+        _miniButton(name, '결석', !isP, Colors.red.shade400, isTMode),
       ],
     );
   }
 
-  Widget _miniButton(String name, String label, bool isSelected, Color color) {
+  Widget _miniButton(
+    String name,
+    String label,
+    bool isSelected,
+    Color color,
+    bool isTMode,
+  ) {
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -532,6 +551,10 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           if (label == '출석') {
             _attendanceData[name]!['reason'] = '연락x';
             _customReasonControllers[name]?.clear();
+          } else {
+            if (isTMode) {
+              _attendanceData[name]!['reason'] = '기타';
+            }
           }
         });
       },
