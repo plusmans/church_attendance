@@ -5,9 +5,8 @@ import 'attendance/attendance_status.dart';
 import 'attendance/attendance_input.dart';
 import 'management/student_management.dart';
 import 'prayer/prayer_screen.dart';
-// 💡 필요한 화면들을 임포트합니다.
 import 'change_password_screen.dart';
-import 'teacher_management_screen.dart'; // 💡 교사 관리 화면 임포트
+import 'teacher_management_screen.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
@@ -82,6 +81,43 @@ class _HomeNavigationState extends State<HomeNavigation> {
     ];
   }
 
+  // 💡 로그아웃 확인 팝업창
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text(
+          '로그아웃',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: const Text(
+          '정말 로그아웃 하시겠습니까?',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text(
+              '로그아웃',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Color themeColor = Colors.teal;
@@ -93,7 +129,6 @@ class _HomeNavigationState extends State<HomeNavigation> {
     if (_selectedIndex == 2) appBarTitle = '학생 관리';
     if (_selectedIndex == 3) appBarTitle = '중보기도';
 
-    // 💡 관리자 권한 확인 변수
     bool isSuperAdmin =
         widget.role == 'admin' ||
         widget.role == '개발자' ||
@@ -124,7 +159,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
         elevation: 0,
         centerTitle: false,
         actions: [
-          // 💡 [추가] 관리자 전용 교사 관리 버튼
+          // 관리자 전용 교사 관리 버튼
           if (widget.role == 'admin')
             IconButton(
               icon: const Icon(
@@ -164,6 +199,18 @@ class _HomeNavigationState extends State<HomeNavigation> {
               );
             },
           ),
+
+          // 💡 [추가] 로그아웃 버튼
+          IconButton(
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 19,
+              color: Colors.white70,
+            ),
+            tooltip: '로그아웃',
+            onPressed: () => _showLogoutDialog(context),
+          ),
+
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
             child: Center(

@@ -2,19 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
-// ✅ 공통 팝업 위젯 임포트
+
+// ✅ 외부 파일에 정의된 StudentRegistrationDialog를 사용
 import '../../widgets/student_registration_dialog.dart';
 
 class StudentManagementScreen extends StatefulWidget {
   final String teacherName;
   final String teacherCell;
   final String teacherRole;
+  final String teacherGrade; // ✅ 선택적 인자로 활용하기 위해 필수(required) 제거
 
   const StudentManagementScreen({
     super.key,
     required this.teacherName,
     required this.teacherCell,
     required this.teacherRole,
+    this.teacherGrade = '1학년', // ✅ 기본값을 부여하여 home_navigation.dart의 에러 해결
   });
 
   @override
@@ -36,6 +39,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   @override
   void initState() {
     super.initState();
+    _myGrade = widget.teacherGrade; // ✅ 초기 학년 설정
     _loadInitialData();
   }
 
@@ -55,13 +59,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           .toList();
       _allTeachers = tSnap.docs.map((doc) => doc.data()).toList();
 
-      String myGrade = '공통';
+      String myGrade = widget.teacherGrade; // ✅ 위젯에서 받은 값을 기본으로 사용
       final myInfo = _allTeachers.firstWhere(
         (t) => t['name'] == widget.teacherName,
         orElse: () => {},
       );
       if (myInfo.isNotEmpty) {
-        myGrade = myInfo['grade'] ?? '공통';
+        myGrade = myInfo['grade'] ?? widget.teacherGrade;
+        // 부장님의 경우 grade가 '공통' 등으로 되어있을 수 있으므로 UI 표시용으론 그대로 두되,
+        // 등록 창 전달시엔 나중에 보정함
         _myGrade = myGrade;
       }
 
@@ -79,22 +85,23 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       '부장',
       'admin',
       '개발자',
-    ].contains(widget.teacherRole);
+    ].contains(widget.teacherRole.trim()); 
+
     if (isSuperAdmin) {
       _availableCells = ['전체', ...List.generate(10, (i) => (i + 1).toString())];
-      if (['강도사', '부장'].contains(widget.teacherRole)) {
+      if (['강도사', '부장'].contains(widget.teacherRole.trim())) {
         _selectedCell = '1';
-      } else if (widget.teacherRole == 'admin' || widget.teacherRole == '개발자') {
+      } else if (widget.teacherRole.trim() == 'admin' || widget.teacherRole.trim() == '개발자') {
         _selectedCell = widget.teacherCell == '담당' ? '1' : widget.teacherCell;
       } else {
         _selectedCell = '전체';
       }
     } else if (widget.teacherCell == '담당') {
-      if (myGrade == '1학년')
+      if (myGrade.contains('1'))
         _availableCells = ['1', '2'];
-      else if (myGrade == '2학년')
+      else if (myGrade.contains('2'))
         _availableCells = ['3', '4', '5', '6'];
-      else if (myGrade == '3학년')
+      else if (myGrade.contains('3'))
         _availableCells = ['7', '8', '9', '10'];
       else
         _availableCells = [widget.teacherCell];
@@ -182,7 +189,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       '부장',
       'admin',
       '개발자',
-    ].contains(widget.teacherRole);
+    ].contains(widget.teacherRole.trim());
     return DefaultTabController(
       key: ValueKey(isSuperAdmin),
       length: isSuperAdmin ? 2 : 1,
@@ -328,28 +335,27 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // ✅ [수정] 새친구 등록 버튼 크기 축소 (height 44 -> 34, 패딩 및 폰트 축소)
   Widget _buildBottomAddButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(
         vertical: 20,
         horizontal: 40,
-      ), // 가로 패딩 늘려서 버튼 폭 줄임
+      ),
       child: Column(
         children: [
           SizedBox(
             width: double.infinity,
-            height: 34, // 높이 축소
+            height: 34,
             child: OutlinedButton.icon(
               onPressed: _showAddNewFriendDialog,
               icon: const Icon(
                 Icons.person_add_alt_1_rounded,
                 size: 14,
-              ), // 아이콘 축소
+              ),
               label: const Text(
                 "새친구 등록",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ), // 폰트 축소
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.orange,
                 padding: EdgeInsets.zero,
@@ -366,6 +372,40 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             style: TextStyle(fontSize: 10, color: Colors.grey),
           ),
         ],
+      ),
+    );
+  }
+
+  // 💡 핵심 수정 부분: 다이얼로그 호출 시 전달값 검증 및 보정
+  void _showAddNewFriendDialog() {
+    String sanitizedCell = _selectedCell ?? '1';
+    
+    // 1. 셀 값 보정: '전체'나 숫자가 아닌 값이 들어오면 '1'로 보정합니다.
+    if (sanitizedCell == '전체' || int.tryParse(sanitizedCell) == null) {
+      sanitizedCell = '1';
+    }
+
+    // 2. 학년 값 보정: 부장님의 경우 _myGrade가 '공통'일 수 있는데, 다이얼로그 드롭다운에는 '1학년'~'3학년'만 있습니다.
+    String sanitizedGrade = _myGrade;
+    if (!['1학년', '2학년', '3학년'].contains(sanitizedGrade)) {
+      sanitizedGrade = '1학년'; // 다이얼로그에서 에러가 나지 않도록 기본값 설정
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StudentRegistrationDialog(
+        initialCell: sanitizedCell, // 보정된 값 전달
+        teacherRole: widget.teacherRole,
+        teacherGrade: sanitizedGrade, // 보정된 학년 전달
+        onRegistered: (docId, finalName) async {
+          await _loadInitialData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉")),
+            );
+          }
+        },
       ),
     );
   }
@@ -673,12 +713,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     return results;
   }
 
-  // ✅ [수정] 생일 파서 강화: "YYYY.MM.DD", "MM.DD", "MM-DD", "MM/DD" 등 모든 형식 대응
   Map<String, int>? _parseBirthDate(dynamic birth) {
     if (birth == null || birth.toString().trim().isEmpty) return null;
-    String b = birth.toString().replaceAll(' ', ''); // 공백 제거
+    String b = birth.toString().replaceAll(' ', '');
 
-    // 1. "MM월 DD일" 형식
     RegExp type1 = RegExp(r'(\d{1,2})월(\d{1,2})일');
     var match1 = type1.firstMatch(b);
     if (match1 != null) {
@@ -688,7 +726,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       };
     }
 
-    // 2. "YYYY-MM-DD" 또는 "YYYY.MM.DD" 또는 "YYYY/MM/DD" 형식
     RegExp type2 = RegExp(r'(\d{4})[\.\-/](\d{1,2})[\.\-/](\d{1,2})');
     var match2 = type2.firstMatch(b);
     if (match2 != null) {
@@ -698,7 +735,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       };
     }
 
-    // 3. "MM.DD" 또는 "MM-DD" 또는 "MM/DD" 형식 (연도 없음)
     RegExp type3 = RegExp(r'^(\d{1,2})[\.\-/](\d{1,2})$');
     var match3 = type3.firstMatch(b);
     if (match3 != null) {
@@ -1080,26 +1116,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showAddNewFriendDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StudentRegistrationDialog(
-        initialCell: _selectedCell ?? '1',
-        teacherRole: widget.teacherRole,
-        teacherGrade: _myGrade,
-        onRegistered: (docId, finalName) async {
-          await _loadInitialData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉")),
-            );
-          }
-        },
       ),
     );
   }

@@ -44,30 +44,70 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
   String _baptism = '해당없음';
   bool _isSaving = false;
 
-  bool get _isGlobalAdmin =>
-      ['강도사', '부장', 'admin', '개발자'].contains(widget.teacherRole);
-  bool get _isGradeAdmin =>
-      ['1학년담당', '2학년담당', '3학년담당'].contains(widget.teacherRole);
+  // 학년별 셀 매핑 데이터
+  final Map<String, List<String>> gradeCellMap = {
+    '1학년담당': ['1', '2'],
+    '2학년담당': ['3', '4', '5', '6'],
+    '3학년담당': ['7', '8', '9', '10'],
+    '1': ['1', '2'],
+    '2': ['3', '4', '5', '6'],
+    '3': ['7', '8', '9', '10'],
+  };
+
+  // 권한 판별 Getters
+  bool get _isAdmin => widget.teacherRole.trim() == 'admin';
+  bool get _isFullAccess => 
+      ['admin', '강도사', '부장', '개발자'].contains(widget.teacherRole.trim());
+  bool get _isGradeAdmin => 
+      widget.teacherRole.trim().contains('학년담당');
 
   @override
   void initState() {
     super.initState();
-    if (_isGlobalAdmin) {
+    final String role = widget.teacherRole.trim();
+    
+    // 1. 학년 초기 설정
+    if (_isFullAccess) {
       _grade = (widget.teacherGrade == '공통' || widget.teacherGrade.isEmpty)
           ? '1학년'
           : widget.teacherGrade;
-    } else if (widget.teacherRole == '1학년담당') {
+    } else if (role == '1학년담당') {
       _grade = '1학년';
-    } else if (widget.teacherRole == '2학년담당') {
+    } else if (role == '2학년담당') {
       _grade = '2학년';
-    } else if (widget.teacherRole == '3학년담당') {
+    } else if (role == '3학년담당') {
       _grade = '3학년';
     } else {
       _grade = widget.teacherGrade;
     }
-    _cell = (widget.initialCell == 'teachers' || widget.initialCell == '전체')
-        ? '1'
-        : widget.initialCell;
+
+    // 2. 셀 초기 설정 및 유효성 검사
+    final List<String> cellOptions = List.generate(10, (i) => (i + 1).toString());
+
+    if (_isFullAccess) {
+      // admin, 강도사, 부장님은 현재 선택되어 있던 셀을 기본으로 하되, 
+      // '교사', '전체' 등 숫자가 아닌 경우 '1'셀로 시작
+      _cell = (widget.initialCell == 'teachers' || widget.initialCell == '전체')
+          ? '1'
+          : widget.initialCell;
+    } else if (_isGradeAdmin) {
+      // 학년담당은 자신의 학년 범위 내의 셀인지 확인 후 초기값 설정
+      List<String> allowed = gradeCellMap[role] ?? [];
+      if (allowed.contains(widget.initialCell)) {
+        _cell = widget.initialCell;
+      } else {
+        _cell = allowed.isNotEmpty ? allowed.first : '1';
+      }
+    } else {
+      // 일반 교사는 본인의 셀로 고정 (학생 등록이므로 teachers는 제외)
+      _cell = widget.initialCell == 'teachers' ? '1' : widget.initialCell;
+    }
+
+    // 💡 [추가] 최종 안전장치: 결정된 _cell 값이 전체 드롭다운 항목(1~10)에 없는 경우 '1'로 고정
+    if (!cellOptions.contains(_cell)) {
+      _cell = '1';
+    }
+
     _firstVisitC.text = _getThisSunday();
   }
 
@@ -79,6 +119,21 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // 현재 로그인한 교사가 선택 가능한 셀 목록 구성
+    List<String> allowedCellNumbers = [];
+    if (_isFullAccess) {
+      allowedCellNumbers = List.generate(10, (i) => (i + 1).toString());
+    } else if (_isGradeAdmin) {
+      allowedCellNumbers = gradeCellMap[widget.teacherRole.trim()] ?? [];
+    } else {
+      allowedCellNumbers = [_cell];
+    }
+
+    // 💡 빌드 시점 안전장치: _cell이 현재 권한에서 허용된 목록에 없으면 첫 번째 항목 선택
+    if (!allowedCellNumbers.contains(_cell)) {
+      _cell = allowedCellNumbers.isNotEmpty ? allowedCellNumbers.first : '1';
+    }
+
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
       contentPadding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -120,7 +175,7 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
                       "학년",
                       _grade,
                       ['1학년', '2학년', '3학년'],
-                      _isGlobalAdmin
+                      _isFullAccess
                           ? (v) => setState(() => _grade = v!)
                           : null,
                     ),
@@ -128,11 +183,12 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
                 ],
               ),
               const SizedBox(height: 8),
+              // ✅ 배정 셀 드롭다운: 보정된 _cell과 allowedCellNumbers 사용
               _buildDropdown(
                 "배정 셀",
                 _cell,
-                List.generate(10, (i) => (i + 1).toString()),
-                (_isGlobalAdmin || _isGradeAdmin)
+                allowedCellNumbers,
+                (_isFullAccess || _isGradeAdmin)
                     ? (v) => setState(() => _cell = v!)
                     : null,
               ),
@@ -201,7 +257,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
               _buildTextField("교내 친구", _friendsC),
               _buildTextField("특이사항/메모", _notesC, maxLines: 2),
 
-              // ✅ 버튼 영역을 리스트 하단으로 이동
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -260,7 +315,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
           ),
         ),
       ),
-      // ✅ 기존 고정된 actions는 제거
     );
   }
 

@@ -116,7 +116,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
       _initStatsMaps();
 
-      // ✅ [안전하게 데이터 추출] .get('key') 대신 .data()['key'] 사용
       int currentStudentTotal = studentSnap.docs.where((d) {
         final data = d.data();
         return (data['group'] ?? (data['isRegular'] == true ? 'A' : 'B')) == 'A';
@@ -190,6 +189,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   void _processWeeklyData(QuerySnapshot snapshot, Map<String, Map<String, dynamic>> baseStats, int sT, int tT) {
     int sP = 0;
+    Map<String, double> cellWeeklyRates = {};
+
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
       String docId = doc.id;
@@ -233,6 +234,10 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             if (info['status'] == '출석') present++;
           });
           baseStats[cleanId]!['present'] = present;
+          
+          // 주별 평균 계산용 데이터
+          int total = baseStats[cleanId]!['total'] as int;
+          cellWeeklyRates[cleanId] = total > 0 ? present / total : 0.0;
         }
       }
     }
@@ -265,6 +270,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             return (int.tryParse(a.key) ?? 99).compareTo(int.tryParse(b.key) ?? 99);
           }),
         );
+        _cellAverages = cellWeeklyRates; // 주별에서도 평균값 업데이트
         _individualStats = individualWeekly;
         _studentPresent = sP;
         _studentTotal = sT; 
@@ -410,8 +416,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // UI 빌더 함수들은 변경사항 없이 유지... (공간 확보를 위해 생략하나 실제 코드엔 포함)
-
   Widget _buildSummaryHeader() {
     double sRate = _studentTotal > 0 ? (_studentPresent / _studentTotal) * 100 : 0;
     double tRate = _teacherTotal > 0 ? (_teacherPresent / _teacherTotal) * 100 : 0;
@@ -553,7 +557,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // [학년/성별 통계 UI]
   Widget _buildDemographicStats() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,7 +592,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // [결석 사유 랭킹 UI]
   Widget _buildAbsenceReasonRanking() {
     var sorted = _absenceReasonCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     var top5 = sorted.take(5).toList();
@@ -761,7 +763,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     }).toList());
   }
 
-  // --- [목양 섹션 및 에러 수정 지점] ---
   Widget _buildPastoralSections() {
     String filterLabelPrefix = _viewType == '누적' ? '연간' : '이달의';
     String dateFilter = _viewType == '누적' ? DateFormat('yyyy').format(_selectedDate) : DateFormat('yyyy-MM').format(_selectedDate);
@@ -794,7 +795,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         if (promotedList.isNotEmpty) ...[_buildNameListSection("🎉 $filterLabelPrefix 등반 소식", promotedList, Colors.indigo), const SizedBox(height: 16)],
         _buildNameListSection("📞 심방 권면 대상", absentList, Colors.red),
         const SizedBox(height: 16),
-        // ✅ [에러 수정] 3개의 인자를 정확히 전달하도록 수정
         _buildSplitNewMemberStatusSection(
           "🌱 새친구 정착 현황",
           freshNewFriends,
@@ -821,7 +821,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     ]);
   }
 
-  // ✅ [함수 정의] 3개의 위치 기반 인자를 정의함
   Widget _buildSplitNewMemberStatusSection(
     String title,
     List<Map<String, dynamic>> freshList,
@@ -858,8 +857,21 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return ListTile(dense: true, visualDensity: VisualDensity.compact, title: Text("${m['name']} (${m['cell']}셀)", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)), subtitle: Padding(padding: const EdgeInsets.only(top: 2), child: ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: progress, backgroundColor: mainColor.withOpacity(0.05), color: mainColor.withOpacity(0.6), minHeight: 4))), trailing: Text("${m['p']}/${m['t']}주", style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 11)));
   }
 
+  // --- 핵심 수정 영역: 최고 출석 셀 동적 계산 ---
   Widget _buildMonthlyInsights() {
     int perfectAttendanceCount = _individualStats.values.where((m) => m['role'] == '학생' && m['p'] == m['t'] && m['t'] > 0).length;
+    
+    // 평균 출석률이 가장 높은 셀 찾기 (교사 제외)
+    String bestCellName = "없음";
+    double maxRate = -1.0;
+    
+    _cellAverages.forEach((cell, rate) {
+      if (cell != '교사' && rate > maxRate) {
+        maxRate = rate;
+        bestCellName = "$cell셀";
+      }
+    });
+
     if (_viewType == '누적') {
       String currentYear = DateFormat('yyyy').format(_selectedDate);
       int totalNew = _individualStats.values.where((m) => m['role'] == '학생' && (m['firstVisitDate']?.toString().startsWith(currentYear) ?? false)).length;
@@ -867,7 +879,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       double settlementRate = totalNew > 0 ? (promoted / totalNew) * 100 : 0;
       return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [_insightCard("개근자", "$perfectAttendanceCount명", Colors.teal), const SizedBox(width: 8), _insightCard("정착률", "${settlementRate.toStringAsFixed(1)}%", Colors.indigo)]));
     }
-    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [_insightCard("이달의 개근", "$perfectAttendanceCount명", Colors.teal), const SizedBox(width: 8), _insightCard("최고 출석 셀", "1셀", Colors.orange)]));
+    
+    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [
+      _insightCard("이달의 개근", "$perfectAttendanceCount명", Colors.teal), 
+      const SizedBox(width: 8), 
+      _insightCard("최고 출석 셀", bestCellName, Colors.orange) // 동적으로 계산된 셀 이름 표시
+    ]));
   }
 
   Widget _insightCard(String label, String value, Color color) {
