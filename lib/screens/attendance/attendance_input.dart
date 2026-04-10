@@ -31,7 +31,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   List<String> _memberNames = [];
   Map<String, TextEditingController> _customReasonControllers = {};
 
-  // 학년별 셀 매핑 데이터 (학년담당 권한용)
   final Map<String, List<String>> gradeCellMap = {
     '1': ['1', '2'],
     '2': ['3', '4', '5', '6'],
@@ -54,23 +53,17 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     _targetDate = widget.selectedDate ?? _getRecentSunday();
     
     final String role = widget.teacherRole.trim();
-    
-    // 권한 그룹 판별
     final bool isAdmin = role == 'admin';
     final bool isFullAccess = isAdmin || role == '강도사' || role == '부장';
     final bool isGradeManager = role.contains('학년담당');
     
-    // 초기 셀 설정 로직
     if (isFullAccess) {
       if (isAdmin) {
-        // admin: 자신의 cell이 우선 (담당 위젯이면 teachers)
         _currentCell = widget.teacherCell == '담당' ? 'teachers' : widget.teacherCell;
       } else {
-        // 강도사, 부장: 기본적으로 '교사전체' 선택
         _currentCell = 'teachers';
       }
     } else if (isGradeManager) {
-      // 학년담당: 해당 학년의 첫 번째 셀로 초기화 (또는 본인 셀이 범위 내에 있으면 유지)
       List<String> allowed = gradeCellMap[role] ?? gradeCellMap[widget.teacherGrade.trim()] ?? [];
       if (allowed.contains(widget.teacherCell)) {
         _currentCell = widget.teacherCell;
@@ -78,7 +71,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         _currentCell = allowed.isNotEmpty ? allowed.first : '1';
       }
     } else {
-      // 일반 교사: 자신의 셀로 고정
       _currentCell = widget.teacherCell == '담당' ? 'teachers' : widget.teacherCell;
     }
 
@@ -87,7 +79,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     });
   }
 
-  // --- 데이터 처리 로직 (기존 유지) ---
   DateTime _getRecentSunday() {
     DateTime now = DateTime.now();
     int daysToSubtract = now.weekday % 7;
@@ -190,36 +181,83 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     } catch (e) { debugPrint("❌ 로드 에러: $e"); } finally { if (mounted) setState(() => _isLoading = false); }
   }
 
+  // 💡 저장 로직: 교사(teachers) 컬렉션에는 절대 쓰기 작업을 하지 않도록 수정
   Future<void> _saveAttendance() async {
     if (_memberNames.isEmpty || !mounted) return;
     setState(() => _isLoading = true);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
+    
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
       String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : (int.tryParse(_currentCell) ?? _currentCell).toString();
       String docId = _currentCell == 'teachers' ? 'teachers_$dateStr' : '${cleanCellNum}셀_$dateStr';
 
       WriteBatch batch = FirebaseFirestore.instance.batch();
+      Map<String, Map<String, dynamic>> recordsToSave = {};
+
       for (var name in _memberNames) {
         if (_attendanceData.containsKey(name)) {
-          _attendanceData[name]!['customReason'] = _customReasonControllers[name]?.text ?? '';
-          String oldStatus = _initialStatusMap[name] ?? '결석';
-          String newStatus = _attendanceData[name]!['status'];
-          String? masterId = _attendanceData[name]!['docId'];
-          if (masterId != null) {
-            DocumentReference masterRef = FirebaseFirestore.instance.collection(_currentCell == 'teachers' ? 'teachers' : 'students').doc(masterId);
-            if (oldStatus != '출석' && newStatus == '출석') batch.update(masterRef, {'attendanceCount': FieldValue.increment(1)});
-            else if (oldStatus == '출석' && newStatus != '출석') batch.update(masterRef, {'attendanceCount': FieldValue.increment(-1)});
+          var currentData = _attendanceData[name]!;
+          String customReasonText = _customReasonControllers[name]?.text ?? '';
+          
+          // 출석부 문서에 저장할 데이터 구성
+          recordsToSave[name] = {
+            'status': currentData['status'] ?? '결석',
+            'reason': currentData['reason'] ?? '연락x',
+            'customReason': customReasonText,
+            'role': currentData['role'] ?? (_currentCell == 'teachers' ? '교사' : '학생'),
+            'group': currentData['group'] ?? 'A',
+          };
+
+          // 💡 수정 핵심: 현재 선택된 셀이 'teachers'가 아닐 때만(학생일 때만) 카운트 업데이트 시도
+          if (_currentCell != 'teachers') {
+            String oldStatus = _initialStatusMap[name] ?? '결석';
+            String newStatus = currentData['status'] ?? '결석';
+            String? masterId = currentData['docId'];
+            
+            // 학생 컬렉션(students)의 attendanceCount만 업데이트
+            if (masterId != null && masterId.isNotEmpty) {
+              DocumentReference masterRef = FirebaseFirestore.instance
+                  .collection('students')
+                  .doc(masterId);
+              
+              if (oldStatus != '출석' && newStatus == '출석') {
+                batch.update(masterRef, {'attendanceCount': FieldValue.increment(1)});
+              } else if (oldStatus == '출석' && newStatus != '출석') {
+                batch.update(masterRef, {'attendanceCount': FieldValue.increment(-1)});
+              }
+            }
           }
         }
       }
-      batch.set(FirebaseFirestore.instance.collection('attendance').doc(docId), {
-        'cell': cleanCellNum, 'date': dateStr, 'records': _attendanceData, 'updatedAt': FieldValue.serverTimestamp(),
+
+      // 최종 출석부 문서 저장 (attendance 컬렉션에만 쓰기 작업 수행)
+      DocumentReference attendanceRef = FirebaseFirestore.instance.collection('attendance').doc(docId);
+      batch.set(attendanceRef, {
+        'cell': cleanCellNum, 
+        'date': dateStr, 
+        'records': recordsToSave, 
+        'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
       await batch.commit();
-      if (mounted) { messenger.showSnackBar(const SnackBar(content: Text("💾 저장되었습니다."))); if (navigator.canPop()) navigator.pop(true); }
-    } catch (e) { if (mounted) messenger.showSnackBar(const SnackBar(content: Text("❌ 저장 오류"))); } finally { if (mounted) setState(() => _isLoading = false); }
+
+      if (mounted) { 
+        messenger.showSnackBar(const SnackBar(content: Text("💾 저장되었습니다."))); 
+        if (navigator.canPop()) navigator.pop(true); 
+      }
+    } catch (e) { 
+      debugPrint("❌ 저장 오류 상세 로그: $e");
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text("❌ 저장 실패: $e"),
+          backgroundColor: Colors.red.shade800,
+        ));
+      }
+    } finally { 
+      if (mounted) setState(() => _isLoading = false); 
+    }
   }
 
   void _addNewStudent() {
@@ -278,11 +316,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     );
   }
 
-  // --- 핵심 수정: 상단 셀 선택기 ---
   Widget _buildTopSelector(Color mainColor) {
     final String role = widget.teacherRole.trim();
-    
-    // 권한 판별 로직
     final bool isAdmin = role == 'admin';
     final bool isFullAccess = isAdmin || role == '강도사' || role == '부장';
     final bool isGradeManager = role.contains('학년담당');
@@ -292,7 +327,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     if (isFullAccess) {
       allowedCellNumbers = List.generate(10, (i) => '${i + 1}');
     } else if (isGradeManager) {
-      // 1학년담당, 2학년담당 등 학년 키워드로 매핑 데이터 가져옴
       allowedCellNumbers = gradeCellMap[role] ?? gradeCellMap[widget.teacherGrade.trim()] ?? [];
     }
 
@@ -322,7 +356,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                   ? DropdownButton<String>(
                       value: _currentCell, iconSize: 16,
                       items: [
-                        // fullAccess(admin, 강도사, 부장)만 교사전체 선택 가능
                         if (isFullAccess) 
                           const DropdownMenuItem(value: 'teachers', child: Text('교사전체', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                         ...allowedCellNumbers.map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)))),
@@ -337,7 +370,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     );
   }
 
-  // --- UI Helper 위젯들 (기존 유지) ---
   Widget _buildSummaryArea(Color mainColor) {
     int pC = _attendanceData.values.where((e) => e['status'] == '출석').length;
     int aC = _attendanceData.values.where((e) => e['status'] != '출석').length;
