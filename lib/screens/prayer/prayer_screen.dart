@@ -22,6 +22,9 @@ class PrayerScreen extends StatefulWidget {
 }
 
 class _PrayerScreenState extends State<PrayerScreen> {
+  // ✅ 스크롤 제어를 위한 컨트롤러
+  final ScrollController _scrollController = ScrollController();
+
   List<TextEditingController> _controllers = [TextEditingController()];
   List<TextEditingController> _commonControllers = [];
   final TextEditingController _urgentController = TextEditingController();
@@ -48,6 +51,27 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
     _generateMonthOptions();
     _loadAllData();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _urgentController.dispose();
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    for (var c in _commonControllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _generateMonthOptions() {
@@ -362,6 +386,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 borderRadius: pw.BorderRadius.circular(5),
               ),
               child: pw.Column(
+                // ✅ 수정한 부분: pw.CrossAxisAlignment를 사용해야 함
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: _commonControllers
                     .map(
@@ -417,6 +442,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 12),
                 child: pw.Column(
+                  // ✅ 수정한 부분: pw.CrossAxisAlignment를 사용해야 함
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
@@ -459,6 +485,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
@@ -469,29 +496,27 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // ✅ 월 선택 드롭다운 (상단 왼쪽)
                       _buildMonthSelector(),
-                      // ✅ PDF 출력 버튼 (상단 오른쪽) 확대
                       TextButton.icon(
                         onPressed: _generateAndPrintPdf,
                         icon: const Icon(
                           Icons.picture_as_pdf,
                           color: Colors.redAccent,
-                          size: 18, // ✅ 14 -> 18로 확대
+                          size: 18, 
                         ),
                         label: const Text(
                           'PDF 출력',
                           style: TextStyle(
                             color: Colors.redAccent,
-                            fontSize: 14, // ✅ 11 -> 14로 확대
+                            fontSize: 14, 
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red.shade50,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12, // ✅ 8 -> 12로 확대
-                            vertical: 8, // ✅ 4 -> 8로 확대
+                            horizontal: 12, 
+                            vertical: 8, 
                           ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -531,7 +556,36 @@ class _PrayerScreenState extends State<PrayerScreen> {
           ),
           _buildUrgentStreamArea(),
           _buildTotalStreamList(),
+          SliverToBoxAdapter(child: _buildScrollToTopButton()),
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildScrollToTopButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: _scrollToTop,
+          icon: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.teal),
+          label: const Text(
+            "맨 위로 이동",
+            style: TextStyle(
+              color: Colors.teal,
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            backgroundColor: Colors.teal.withValues(alpha: 0.05),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -695,27 +749,26 @@ class _PrayerScreenState extends State<PrayerScreen> {
     );
   }
 
-  // ✅ 월 선택 드롭다운 UI 확대
   Widget _buildMonthSelector() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.calendar_month, color: Colors.teal, size: 18), // ✅ 16 -> 18로 확대
+        const Icon(Icons.calendar_month, color: Colors.teal, size: 18), 
         const SizedBox(width: 6),
         Container(
-          height: 38, // ✅ 28 -> 38로 대폭 확대
-          padding: const EdgeInsets.symmetric(horizontal: 10), // ✅ 6 -> 10으로 확대
+          height: 38, 
+          padding: const EdgeInsets.symmetric(horizontal: 10), 
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.teal.shade200, width: 1.0), // ✅ 선 두께 및 색상 강조
+            border: Border.all(color: Colors.teal.shade200, width: 1.0), 
             color: Colors.white,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _currentMonth,
-              icon: const Icon(Icons.arrow_drop_down, size: 24, color: Colors.teal), // ✅ 18 -> 24로 확대
+              icon: const Icon(Icons.arrow_drop_down, size: 24, color: Colors.teal), 
               style: const TextStyle(
-                fontSize: 16, // ✅ 12 -> 16으로 대폭 확대
+                fontSize: 16, 
                 color: Colors.black87,
                 fontWeight: FontWeight.bold,
               ),
@@ -1084,17 +1137,5 @@ class _PrayerScreenState extends State<PrayerScreen> {
         );
       },
     );
-  }
-
-  @override
-  void dispose() {
-    _urgentController.dispose();
-    for (var c in _controllers) {
-      c.dispose();
-    }
-    for (var c in _commonControllers) {
-      c.dispose();
-    }
-    super.dispose();
   }
 }

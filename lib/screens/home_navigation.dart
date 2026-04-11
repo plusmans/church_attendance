@@ -38,7 +38,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
     "선생님의 수고를 응원해요! ✨",
     "우리 아이들의 소중한 목자님! 🌱",
     "기쁨이 가득한 하루 되세요! 😊",
-    "기대로 함께하는 동역자입니다! ❤️",
+    "기도로 함께하는 동역자입니다! ❤️",
   ];
 
   late List<Widget> _screens;
@@ -145,22 +145,28 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
     return Scaffold(
       appBar: AppBar(
-        // 모바일 공간 확보를 위해 높이 유지
         toolbarHeight: 64,
+        // ✅ titleSpacing을 줄여 제목 영역의 가로 공간을 최대한 확보
+        titleSpacing: 12,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              _cheerMessage,
-              style: TextStyle(
-                // ✅ 응원 메시지 크기 확대 (10.5 -> 13.5) 및 시인성 개선
-                fontSize: 13.5,
-                color: Colors.white.withValues(alpha: 0.95),
-                fontWeight: FontWeight.w500,
-                letterSpacing: -0.5,
+            // ✅ FittedBox를 사용하여 내용이 길어도 잘리지 않고 크기를 맞춰 보여줌
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _cheerMessage,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: Colors.white.withValues(alpha: 0.95),
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: -0.5,
+                ),
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               appBarTitle,
               style: const TextStyle(
@@ -176,10 +182,12 @@ class _HomeNavigationState extends State<HomeNavigation> {
         elevation: 0,
         centerTitle: false,
         actions: [
-          // 관리자 전용 교사 관리 버튼
+          // ✅ 아이콘 버튼들의 패딩을 줄여서 공간 확보
           if (widget.role == 'admin')
             IconButton(
-              icon: const Icon(Icons.people_alt_rounded, size: 24, color: Colors.white70),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.people_alt_rounded, size: 22, color: Colors.white70),
               tooltip: '교사 관리',
               onPressed: () {
                 Navigator.push(
@@ -189,9 +197,10 @@ class _HomeNavigationState extends State<HomeNavigation> {
               },
             ),
 
-          // 비밀번호 변경 버튼
           IconButton(
-            icon: const Icon(Icons.lock_reset_rounded, size: 24, color: Colors.white70),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.lock_reset_rounded, size: 22, color: Colors.white70),
             tooltip: '비밀번호 변경',
             onPressed: () {
               Navigator.push(
@@ -207,34 +216,37 @@ class _HomeNavigationState extends State<HomeNavigation> {
             },
           ),
 
-          // 로그아웃 버튼
           IconButton(
-            icon: const Icon(Icons.logout_rounded, size: 24, color: Colors.white70),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.logout_rounded, size: 22, color: Colors.white70),
             tooltip: '로그아웃',
             onPressed: () => _showLogoutDialog(context),
           ),
 
-          // 우측 끝 사용자 정보
+          const SizedBox(width: 4),
+
+          // 우측 끝 사용자 정보 (최소한의 너비만 사용)
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: const EdgeInsets.only(right: 8.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   '${widget.teacherName} ${isSuperAdmin ? '사역자' : '교사'}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
                     displayRole,
-                    style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w400),
+                    style: const TextStyle(fontSize: 7, color: Colors.white, fontWeight: FontWeight.w400),
                   ),
                 ),
               ],

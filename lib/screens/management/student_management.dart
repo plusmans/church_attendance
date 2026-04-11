@@ -27,6 +27,9 @@ class StudentManagementScreen extends StatefulWidget {
 }
 
 class _StudentManagementScreenState extends State<StudentManagementScreen> {
+  // ✅ 스크롤 제어를 위한 컨트롤러 추가
+  final ScrollController _scrollController = ScrollController();
+
   bool _isLoading = true;
   String? _selectedCell;
   List<String> _availableCells = [];
@@ -42,6 +45,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     super.initState();
     _myGrade = widget.teacherGrade;
     _loadInitialData();
+  }
+
+  // ✅ 컨트롤러 해제
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ✅ 최상단으로 스크롤하는 함수
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
   }
 
   Future<void> _loadInitialData() async {
@@ -258,6 +277,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         .toList();
 
     return ListView(
+      controller: _scrollController, // ✅ 컨트롤러 연결
       padding: const EdgeInsets.symmetric(horizontal: 8),
       children: [
         _buildBirthdayBanner(),
@@ -281,6 +301,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
         ],
         _buildBottomAddButton(),
+        // ✅ 리스트 하단에 맨 위로 가기 버튼 추가
+        _buildScrollToTopButton(),
         const SizedBox(height: 50),
       ],
     );
@@ -298,6 +320,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         .toList();
 
     return ListView(
+      controller: _scrollController, // ✅ 행정 탭 리스트에도 컨트롤러 연결
       padding: const EdgeInsets.all(12),
       children: [
         _buildAdminSectionTitle("✅ 등반 대기 (새친구 출석 4회 이상)", Colors.green),
@@ -330,8 +353,38 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             (s) => _buildPromotionCard(s, isReady: false),
           ),
         _buildBottomAddButton(),
+        // ✅ 행정 탭 하단에도 맨 위로 가기 버튼 추가
+        _buildScrollToTopButton(),
         const SizedBox(height: 50),
       ],
+    );
+  }
+
+  // ✅ [공통 위젯] 맨 위로 가기 버튼
+  Widget _buildScrollToTopButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: _scrollToTop,
+          icon: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.indigo),
+          label: const Text(
+            "맨 위로 이동",
+            style: TextStyle(
+              color: Colors.indigo,
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            backgroundColor: Colors.indigo.withValues(alpha: 0.05),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -609,11 +662,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // ✅ [수정] 생일자 명단에 구분선 추가 및 학생/교사 분리 배치
   Widget _buildBirthdayBanner() {
     final list = _getBirthdayPeople();
     
-    // 학생과 교사 데이터를 분리
     final studentBirthdays = list.where((p) => p['type'] == '학생').toList();
     final teacherBirthdays = list.where((p) => p['type'] == '교사').toList();
 
@@ -675,7 +726,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           
           const SizedBox(height: 12),
 
-          // 1. 학생(아이들) 명단
           if (studentBirthdays.isNotEmpty)
             Wrap(
               spacing: 6,
@@ -683,7 +733,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               children: studentBirthdays.map((p) => _buildBirthdayChip(p)).toList(),
             ),
 
-          // 2. 구분선 (학생과 교사 둘 다 있을 때만 표시)
           if (studentBirthdays.isNotEmpty && teacherBirthdays.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -699,7 +748,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               ),
             ),
 
-          // 3. 선생님 명단
           if (teacherBirthdays.isNotEmpty)
             Wrap(
               spacing: 6,
@@ -711,7 +759,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // 생일자 칩 빌더 (중복 코드 방지)
   Widget _buildBirthdayChip(Map<String, dynamic> p) {
     String subInfo = p['type'] == '학생' ? "${p['cell']}셀" : "교사";
     return Container(

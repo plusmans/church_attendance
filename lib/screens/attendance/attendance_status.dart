@@ -11,6 +11,9 @@ class AttendanceStatusScreen extends StatefulWidget {
 }
 
 class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
+  // ✅ 스크롤 제어를 위한 컨트롤러
+  final ScrollController _scrollController = ScrollController();
+  
   DateTime _selectedDate = _getRecentSunday();
   String _viewType = '주별';
   String _groupingMode = '셀별';
@@ -43,6 +46,21 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   void initState() {
     super.initState();
     _fetchStats();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ✅ 최상단으로 스크롤하는 함수
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
   }
 
   String _normalizeName(dynamic rawName) {
@@ -360,25 +378,55 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // ✅ 전체 페이지가 한꺼번에 스크롤되도록 ListView로 통합
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator()) 
           : ListView(
+              controller: _scrollController,
               padding: EdgeInsets.zero,
               children: [
                 _buildSummaryHeader(),
                 _buildViewToggle(),
                 _buildGroupingToggle(),
-                // ✅ 선택된 모드에 따라 해당 섹션을 직접 렌더링 (하위 ListView들의 스크롤은 비활성화됨)
                 if (_groupingMode == '개인별') 
                   _buildIndividualList()
                 else if (_viewType == '주별') 
                   _buildWeeklyDetailList() 
                 else 
                   _buildDashboard(),
-                const SizedBox(height: 50), // 하단 여백
+                
+                // ✅ 리스트의 가장 하단에 '맨 위로' 버튼 배치
+                _buildScrollToTopButton(),
+                const SizedBox(height: 40), 
               ],
             ),
+    );
+  }
+
+  // ✅ [추가] 맨 위로 가기 버튼 위젯
+  Widget _buildScrollToTopButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Center(
+        child: TextButton.icon(
+          onPressed: _scrollToTop,
+          icon: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.teal),
+          label: const Text(
+            "맨 위로 이동",
+            style: TextStyle(
+              color: Colors.teal,
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            backgroundColor: Colors.teal.withValues(alpha: 0.05),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -498,7 +546,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     ); 
   }
 
-  // ✅ ListView를 Column으로 변경하여 전체 스크롤 내에서 동작하도록 함
   Widget _buildDashboard() {
     return Column(
       children: [
@@ -598,7 +645,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // ✅ ListView.builder를 Column + List.generate로 변경하거나 shrinkWrap 적용
   Widget _buildIndividualList() {
     final studentList = _individualStats.values.where((m) => m['role'] != '교사').toList();
     if (_individualSortMode == '랭킹순') {
@@ -609,8 +655,8 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return ListView.builder(
       padding: const EdgeInsets.all(10), 
       itemCount: studentList.length, 
-      shrinkWrap: true, // ✅ 부모 스크롤을 위해 필수
-      physics: const NeverScrollableScrollPhysics(), // ✅ 내부 스크롤 비활성화
+      shrinkWrap: true, 
+      physics: const NeverScrollableScrollPhysics(), 
       itemBuilder: (c, i) {
         final m = studentList[i];
         final double r = (m['t'] ?? 0) > 0 ? (m['p'] / m['t']) : 0;
@@ -636,7 +682,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // ✅ ListView를 Column으로 변경
   Widget _buildWeeklyDetailList() {
     return Column(
       children: [
