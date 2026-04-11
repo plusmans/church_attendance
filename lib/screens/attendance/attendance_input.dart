@@ -85,13 +85,15 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       String docId = _currentCell == 'teachers' ? "teachers_$dateStr" : "$cleanCellNum셀_$dateStr";
 
       var attendanceDoc = await FirebaseFirestore.instance.collection('attendance').doc(docId).get();
-      
+      if (!mounted) return; // ✅ 비동기 작업 후 체크
+
       QuerySnapshot masterSnap;
       if (_currentCell == 'teachers') {
         masterSnap = await FirebaseFirestore.instance.collection('teachers').get();
       } else {
         masterSnap = await FirebaseFirestore.instance.collection('students').where('cell', isEqualTo: cleanCellNum).get();
       }
+      if (!mounted) return; // ✅ 비동기 작업 후 체크
 
       Map<String, Map<String, dynamic>> masterInfoMap = {};
       for (var mDoc in masterSnap.docs) {
@@ -108,11 +110,13 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       _customReasonControllers.clear();
       _initialStatusMap.clear();
 
+      Map<String, Map<String, dynamic>> finalData = {};
+      Set<String> allMemberNames = {};
+
       if (attendanceDoc.exists) {
         Map<String, dynamic> records = Map<String, dynamic>.from(attendanceDoc.data()?['records'] ?? {});
-        Set<String> allMemberNames = {...records.keys, ...masterInfoMap.keys};
+        allMemberNames = {...records.keys, ...masterInfoMap.keys};
 
-        Map<String, Map<String, dynamic>> finalData = {};
         for (var name in allMemberNames) {
           if (records.containsKey(name)) {
             var rec = Map<String, dynamic>.from(records[name]);
@@ -135,30 +139,13 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           }
           _customReasonControllers[name] = TextEditingController(text: finalData[name]!['customReason'] ?? '');
         }
-
-        // ✅ 정렬: 그룹(A->B) 우선, 그 다음 이름순
-        List<String> sortedNames = allMemberNames.toList();
-        sortedNames.sort((a, b) {
-          String gA = (finalData[a]?['group'] ?? 'B').toString().toUpperCase();
-          String gB = (finalData[b]?['group'] ?? 'B').toString().toUpperCase();
-          if (gA != gB) return gA.compareTo(gB);
-          return a.compareTo(b);
-        });
-
-        setState(() {
-          _memberNames = sortedNames;
-          _attendanceData = finalData;
-        });
       } else {
-        Map<String, Map<String, dynamic>> temp = {};
-        List<String> names = [];
         String defStatus = _currentCell == 'teachers' ? '출석' : '결석';
-        
         masterInfoMap.forEach((name, mData) {
-          names.add(name);
+          allMemberNames.add(name);
           _initialStatusMap[name] = defStatus;
           _customReasonControllers[name] = TextEditingController();
-          temp[name] = {
+          finalData[name] = {
             'status': defStatus, 'reason': '연락x', 'customReason': '',
             'grade': mData['grade'] ?? '', 'role': mData['role'] ?? '',
             'cell': mData['cell'] ?? (_currentCell == 'teachers' ? '교사' : _currentCell),
@@ -170,18 +157,20 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             'school': mData['school'] ?? '',
           };
         });
+      }
 
-        // ✅ 정렬: 그룹(A->B) 우선, 그 다음 이름순
-        names.sort((a, b) {
-          String gA = (temp[a]?['group'] ?? 'B').toString().toUpperCase();
-          String gB = (temp[b]?['group'] ?? 'B').toString().toUpperCase();
-          if (gA != gB) return gA.compareTo(gB);
-          return a.compareTo(b);
-        });
-        
-        setState(() { 
-          _memberNames = names; 
-          _attendanceData = temp; 
+      List<String> sortedNames = allMemberNames.toList();
+      sortedNames.sort((a, b) {
+        String gA = (finalData[a]?['group'] ?? 'B').toString().toUpperCase();
+        String gB = (finalData[b]?['group'] ?? 'B').toString().toUpperCase();
+        if (gA != gB) return gA.compareTo(gB);
+        return a.compareTo(b);
+      });
+
+      if (mounted) { // ✅ 최종 결과 반영 전 체크
+        setState(() {
+          _memberNames = sortedNames;
+          _attendanceData = finalData;
         });
       }
     } catch (e) { 
@@ -209,7 +198,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       for (var name in _memberNames) {
         if (_attendanceData.containsKey(name)) {
           var currentData = _attendanceData[name]!;
-          
           recordsToSave[name] = {
             'status': currentData['status'] ?? '결석',
             'reason': currentData['reason'] ?? '연락x',
@@ -246,12 +234,11 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       }, SetOptions(merge: true));
 
       await batch.commit();
+      if (!mounted) return; // ✅ 저장 완료 후 체크
       
-      if (mounted) { 
-        messenger.showSnackBar(const SnackBar(content: Text("💾 저장되었습니다."))); 
-        if (navigator.canPop()) {
-          navigator.pop(true); 
-        }
+      messenger.showSnackBar(const SnackBar(content: Text("💾 저장되었습니다."))); 
+      if (navigator.canPop()) {
+        navigator.pop(true); 
       }
     } catch (e) { 
       debugPrint("❌ 저장 에러: $e"); 
@@ -267,6 +254,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     showDialog(context: context, barrierDismissible: false, builder: (context) => StudentRegistrationDialog(
       initialCell: _currentCell, teacherRole: widget.teacherRole, teacherGrade: widget.teacherGrade,
       onRegistered: (docId, finalName) {
+        if (!mounted) return;
         setState(() {
           _memberNames.add(finalName);
           _attendanceData[finalName] = { 
@@ -277,7 +265,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           _initialStatusMap[finalName] = '결석'; 
           _customReasonControllers[finalName] = TextEditingController();
           
-          // 추가 후 다시 정렬
           _memberNames.sort((a, b) {
             String gA = (_attendanceData[a]?['group'] ?? 'B').toString().toUpperCase();
             String gB = (_attendanceData[b]?['group'] ?? 'B').toString().toUpperCase();
@@ -442,7 +429,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           items: _absenceReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 15)))).toList(), 
           onChanged: (v) { 
             if (v != null) {
-              setState(() => _attendanceData[n]!['reason'] = v);
+              if (mounted) setState(() => _attendanceData[n]!['reason'] = v);
             }
           }
         )

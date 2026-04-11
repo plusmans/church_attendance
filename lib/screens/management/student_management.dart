@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ 입력 제한 기능을 위해 추가
+import 'package:flutter/services.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -27,8 +27,9 @@ class StudentManagementScreen extends StatefulWidget {
 }
 
 class _StudentManagementScreenState extends State<StudentManagementScreen> {
-  // ✅ 스크롤 제어를 위한 컨트롤러 추가
-  final ScrollController _scrollController = ScrollController();
+  // ✅ 탭별로 별도의 컨트롤러 생성 (중복 부착 에러 방지)
+  final ScrollController _studentScrollController = ScrollController();
+  final ScrollController _adminScrollController = ScrollController();
 
   bool _isLoading = true;
   String? _selectedCell;
@@ -47,20 +48,30 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     _loadInitialData();
   }
 
-  // ✅ 컨트롤러 해제
   @override
   void dispose() {
-    _scrollController.dispose();
+    // ✅ 모든 컨트롤러 해제
+    _studentScrollController.dispose();
+    _adminScrollController.dispose();
     super.dispose();
   }
 
-  // ✅ 최상단으로 스크롤하는 함수
+  // ✅ 연결된 모든 컨트롤러를 최상단으로 스크롤 (활성화된 것만 동작)
   void _scrollToTop() {
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
+    if (_studentScrollController.hasClients) {
+      _studentScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+    if (_adminScrollController.hasClients) {
+      _adminScrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -277,7 +288,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         .toList();
 
     return ListView(
-      controller: _scrollController, // ✅ 컨트롤러 연결
+      controller: _studentScrollController, // ✅ 학생 전용 컨트롤러
       padding: const EdgeInsets.symmetric(horizontal: 8),
       children: [
         _buildBirthdayBanner(),
@@ -301,7 +312,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
         ],
         _buildBottomAddButton(),
-        // ✅ 리스트 하단에 맨 위로 가기 버튼 추가
         _buildScrollToTopButton(),
         const SizedBox(height: 50),
       ],
@@ -320,7 +330,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         .toList();
 
     return ListView(
-      controller: _scrollController, // ✅ 행정 탭 리스트에도 컨트롤러 연결
+      controller: _adminScrollController, // ✅ 관리 전용 컨트롤러
       padding: const EdgeInsets.all(12),
       children: [
         _buildAdminSectionTitle("✅ 등반 대기 (새친구 출석 4회 이상)", Colors.green),
@@ -353,14 +363,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             (s) => _buildPromotionCard(s, isReady: false),
           ),
         _buildBottomAddButton(),
-        // ✅ 행정 탭 하단에도 맨 위로 가기 버튼 추가
         _buildScrollToTopButton(),
         const SizedBox(height: 50),
       ],
     );
   }
 
-  // ✅ [공통 위젯] 맨 위로 가기 버튼
   Widget _buildScrollToTopButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
@@ -802,32 +810,52 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Map<String, int>? _parseBirthDate(dynamic birth) {
     if (birth == null || birth.toString().trim().isEmpty) return null;
-    String b = birth.toString().replaceAll(' ', '');
+    String b = birth.toString().replaceAll(' ', '').replaceAll('.', '').replaceAll('-', '').replaceAll('/', '');
 
-    RegExp type1 = RegExp(r'(\d{1,2})월(\d{1,2})일');
-    var match1 = type1.firstMatch(b);
-    if (match1 != null) {
+    RegExp typeKorean = RegExp(r'(\d{1,2})월(\d{1,2})일');
+    var matchKorean = typeKorean.firstMatch(birth.toString().replaceAll(' ', ''));
+    if (matchKorean != null) {
       return {
-        'month': int.parse(match1.group(1)!),
-        'day': int.parse(match1.group(2)!),
+        'month': int.parse(matchKorean.group(1)!),
+        'day': int.parse(matchKorean.group(2)!),
       };
     }
 
-    RegExp type2 = RegExp(r'(\d{4})[\.\-/](\d{1,2})[\.\-/](\d{1,2})');
-    var match2 = type2.firstMatch(b);
-    if (match2 != null) {
+    if (RegExp(r'^\d+$').hasMatch(b)) {
+      if (b.length == 8) {
+        return {
+          'month': int.parse(b.substring(4, 6)),
+          'day': int.parse(b.substring(6, 8)),
+        };
+      } else if (b.length == 4) {
+        return {
+          'month': int.parse(b.substring(0, 2)),
+          'day': int.parse(b.substring(2, 4)),
+        };
+      } else if (b.length == 6) {
+        return {
+          'month': int.parse(b.substring(2, 4)),
+          'day': int.parse(b.substring(4, 6)),
+        };
+      }
+    }
+
+    String original = birth.toString().replaceAll(' ', '');
+    RegExp typeWithDivider = RegExp(r'(\d{2,4})[\.\-/](\d{1,2})[\.\-/](\d{1,2})');
+    var matchDivider = typeWithDivider.firstMatch(original);
+    if (matchDivider != null) {
       return {
-        'month': int.parse(match2.group(2)!),
-        'day': int.parse(match2.group(3)!),
+        'month': int.parse(matchDivider.group(2)!),
+        'day': int.parse(matchDivider.group(3)!),
       };
     }
 
-    RegExp type3 = RegExp(r'^(\d{1,2})[\.\-/](\d{1,2})$');
-    var match3 = type3.firstMatch(b);
-    if (match3 != null) {
+    RegExp typeShortDivider = RegExp(r'^(\d{1,2})[\.\-/](\d{1,2})$');
+    var matchShort = typeShortDivider.firstMatch(original);
+    if (matchShort != null) {
       return {
-        'month': int.parse(match3.group(1)!),
-        'day': int.parse(match3.group(2)!),
+        'month': int.parse(matchShort.group(1)!),
+        'day': int.parse(matchShort.group(2)!),
       };
     }
 
