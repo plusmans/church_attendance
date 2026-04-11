@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ 입력 제한 기능을 위해 추가
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
@@ -117,7 +118,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     int attendance = s['attendanceCount'] ?? 0;
     String autoDate = _getToday();
     
-    // ✅ Async gap 해결을 위해 ScaffoldMessenger를 비동기 호출 전에 미리 참조
     final messenger = ScaffoldMessenger.of(context);
 
     bool? confirm = await showDialog<bool>(
@@ -128,27 +128,28 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("학생: ${s['name']}"),
-            Text("현재 출석: $attendance회"),
-            const SizedBox(height: 10),
+            Text("학생: ${s['name']}", style: const TextStyle(fontSize: 16)),
+            Text("현재 출석: $attendance회", style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 12),
             Text(
               "등반 일자: $autoDate",
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
+                fontSize: 16,
                 color: Colors.blue,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             const Text(
               "해당 학생을 정규 리스트(A그룹)로 이동하시겠습니까?",
-              style: TextStyle(fontSize: 13),
+              style: TextStyle(fontSize: 15),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("취소"),
+            child: const Text("취소", style: TextStyle(fontSize: 15)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -156,7 +157,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               backgroundColor: Colors.indigo,
               foregroundColor: Colors.white,
             ),
-            child: const Text("등반 확정"),
+            child: const Text("등반 확정", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -174,14 +175,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               'updatedAt': FieldValue.serverTimestamp(),
             });
         
-        // ✅ context.mounted 체크를 통해 unrelated mounted check 해결
         if (!context.mounted) return;
         
         await _loadInitialData();
         
-        // ✅ 미리 저장해둔 messenger 사용
         messenger.showSnackBar(
-          SnackBar(content: Text("${s['name']} 학생이 등반되었습니다!")),
+          SnackBar(content: Text("${s['name']} 학생이 등반되었습니다!", style: const TextStyle(fontSize: 14))),
         );
       } catch (e) {
         messenger.showSnackBar(SnackBar(content: Text("오류 발생: $e")));
@@ -212,16 +211,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       labelColor: Colors.indigo,
                       unselectedLabelColor: Colors.grey,
                       indicatorColor: Colors.indigo,
-                      indicatorWeight: 3,
+                      indicatorWeight: 4,
                       indicatorSize: TabBarIndicatorSize.label,
                       labelStyle: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 16, 
                       ),
                       tabs: [
-                        const Tab(height: 44, text: "학생 명단"),
+                        const Tab(height: 56, text: "학생 명단"), 
                         if (isSuperAdmin)
-                          const Tab(height: 44, text: "등반/행정 관리"),
+                          const Tab(height: 56, text: "등반/행정 관리"),
                       ],
                     ),
                   ),
@@ -310,25 +309,25 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         _buildAdminSectionTitle("✅ 등반 대기 (새친구 출석 4회 이상)", Colors.green),
         if (readyToPromote.isEmpty)
           const Padding(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.all(30),
             child: Center(
               child: Text(
                 "등반 가능한 새친구가 없습니다.",
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: Colors.grey, fontSize: 15),
               ),
             ),
           )
         else
           ...readyToPromote.map((s) => _buildPromotionCard(s, isReady: true)),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
         _buildAdminSectionTitle("🔍 B그룹 관리 대상 (새친구 포함)", Colors.orange),
         if (managementTarget.isEmpty)
           const Padding(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.all(30),
             child: Center(
               child: Text(
                 "관리 중인 B그룹 인원이 없습니다.",
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: Colors.grey, fontSize: 15),
               ),
             ),
           )
@@ -345,38 +344,38 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   Widget _buildBottomAddButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        vertical: 20,
+        vertical: 30,
         horizontal: 40,
       ),
       child: Column(
         children: [
           SizedBox(
             width: double.infinity,
-            height: 34,
+            height: 44, 
             child: OutlinedButton.icon(
               onPressed: _showAddNewFriendDialog,
               icon: const Icon(
                 Icons.person_add_alt_1_rounded,
-                size: 14,
+                size: 18, 
               ),
               label: const Text(
                 "새친구 등록",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15), 
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.orange,
                 padding: EdgeInsets.zero,
-                side: const BorderSide(color: Colors.orange, width: 1.0),
+                side: const BorderSide(color: Colors.orange, width: 1.5),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           const Text(
             "명단의 마지막입니다.",
-            style: TextStyle(fontSize: 10, color: Colors.grey),
+            style: TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
       ),
@@ -399,7 +398,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        // ✅ context 가드를 위해 미리 확보
         final messenger = ScaffoldMessenger.of(context);
         
         return StudentRegistrationDialog(
@@ -407,14 +405,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           teacherRole: widget.teacherRole,
           teacherGrade: sanitizedGrade, 
           onRegistered: (docId, finalName) async {
-            // ✅ context.mounted를 직접 체크하여 Lint 해결
             if (!context.mounted) return;
             
             await _loadInitialData();
             
             if (context.mounted) {
               messenger.showSnackBar(
-                SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉")),
+                SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉", style: const TextStyle(fontSize: 14))),
               );
             }
           },
@@ -425,20 +422,20 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Widget _buildAdminSectionTitle(String title, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
             color: color.withValues(alpha: 0.3), 
-            width: 1.5,
+            width: 2.0,
           ),
         ),
       ),
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 13,
+          fontSize: 16, 
           fontWeight: FontWeight.bold,
           color: color,
         ),
@@ -450,31 +447,31 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     int count = s['attendanceCount'] ?? 0;
     bool isNew = s['role'] == '새친구';
     return Card(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: isReady ? Colors.green.shade100 : Colors.grey.shade200,
+          width: 1.5,
         ),
       ),
       child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         leading: Container(
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             color: isNew
                 ? Colors.orange.shade50
                 : (isReady ? Colors.green.shade50 : Colors.grey.shade50),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Center(
             child: Text(
               "${s['cell']}셀",
               style: TextStyle(
-                fontSize: 9,
+                fontSize: 12, 
                 fontWeight: FontWeight.bold,
                 color: isNew
                     ? Colors.orange.shade800
@@ -487,21 +484,21 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           children: [
             Text(
               s['name'],
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), 
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 6),
             if (isNew)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.orange,
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
                   "새친구",
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 7,
+                    fontSize: 10, 
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -510,24 +507,24 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         ),
         subtitle: Text(
           "출석 $count회 | ${s['grade']}",
-          style: const TextStyle(fontSize: 11),
+          style: const TextStyle(fontSize: 14), 
         ),
         trailing: SizedBox(
-          height: 28,
+          height: 34,
           child: ElevatedButton(
             onPressed: () => _promoteStudent(s),
             style: ElevatedButton.styleFrom(
               backgroundColor: isReady ? Colors.green : Colors.grey.shade300,
               foregroundColor: isReady ? Colors.white : Colors.black54,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: Text(
               isReady ? "승인" : "강제",
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), 
             ),
           ),
         ),
@@ -537,22 +534,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Widget _buildGroupHeader(String title, Color color) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+      padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
       child: Row(
         children: [
           Container(
-            width: 3,
-            height: 10,
+            width: 4,
+            height: 14, 
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
             title,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 14, 
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -564,7 +561,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Widget _buildControlBar(int totalCount) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       decoration: const BoxDecoration(color: Colors.white),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -573,19 +570,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             children: [
               const Text(
                 "학생 리스트",
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold), 
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               Text(
                 "(총 $totalCount명)",
-                style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
+                style: const TextStyle(fontSize: 13, color: Colors.blueGrey), 
               ),
             ],
           ),
           if (_availableCells.length > 1)
             Container(
-              height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: Colors.indigo.shade50,
                 borderRadius: BorderRadius.circular(12),
@@ -593,7 +590,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedCell,
-                  iconSize: 14,
+                  iconSize: 18,
                   items: _availableCells
                       .map(
                         (c) => DropdownMenuItem(
@@ -603,7 +600,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.indigo,
-                              fontSize: 10,
+                              fontSize: 13, 
                             ),
                           ),
                         ),
@@ -622,13 +619,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     final list = _getBirthdayPeople();
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Colors.indigo.shade400, Colors.indigo.shade600],
         ),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,11 +638,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 12,
+                  fontSize: 15, 
                 ),
               ),
               SizedBox(
-                height: 18,
+                height: 24,
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
                     value: _selectedBirthMonth,
@@ -653,7 +650,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     icon: const Icon(
                       Icons.arrow_drop_down,
                       color: Colors.white,
-                      size: 14,
+                      size: 20,
                     ),
                     items: List.generate(12, (i) => i + 1)
                         .map(
@@ -663,7 +660,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                               "$m월",
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 10,
+                                fontSize: 13, 
                               ),
                             ),
                           ),
@@ -677,26 +674,26 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           ),
           if (list.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 4.0),
+              padding: const EdgeInsets.only(top: 10.0),
               child: Wrap(
-                spacing: 4,
-                runSpacing: 4,
+                spacing: 6,
+                runSpacing: 6,
                 children: list
                     .map(
                       (p) => Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
+                          horizontal: 8,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15), 
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           "${p['name']} ($_selectedBirthMonth/${p['birthDay']})", 
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 9,
+                            fontSize: 12, 
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -773,22 +770,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         (s['attendanceCount'] ?? 0) <= 1 || s['isCrisis'] == true;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), 
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 120,
+            width: 150, 
             child: Row(
               children: [
                 SizedBox(
-                  width: 20,
+                  width: 28,
                   child: Text(
                     '$index',
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 13,
                       color: Colors.grey.shade400,
                       fontWeight: FontWeight.bold,
                     ),
@@ -803,7 +800,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           s['name'],
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 16, 
                             color: isNewFriend
                                 ? Colors.orange.shade800
                                 : Colors.black87,
@@ -813,26 +810,26 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       ),
                       if (isCrisis)
                         const Padding(
-                          padding: EdgeInsets.only(left: 2),
-                          child: Text("🔴", style: TextStyle(fontSize: 8)),
+                          padding: EdgeInsets.only(left: 4),
+                          child: Text("🔴", style: TextStyle(fontSize: 10)),
                         ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 2),
+                const SizedBox(width: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 3,
-                    vertical: 1,
+                    horizontal: 5,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
                     cellBadge,
                     style: const TextStyle(
-                      fontSize: 7,
+                      fontSize: 10,
                       color: Colors.blueGrey,
                       fontWeight: FontWeight.bold,
                     ),
@@ -842,14 +839,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
           ),
           Expanded(
-            flex: 22,
+            flex: 25,
             child: GestureDetector(
               onTap: () => _makeCall(phone),
               child: Text(
                 phone,
                 style: const TextStyle(
-                  fontSize: 10,
+                  fontSize: 15, 
                   color: Colors.blue,
+                  fontWeight: FontWeight.w500,
                   decoration: TextDecoration.underline,
                 ),
                 textAlign: TextAlign.left,
@@ -858,21 +856,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             ),
           ),
           Expanded(
-            flex: 38,
+            flex: 40,
             child: GestureDetector(
-              onTap: () => _makeCall(pPhone),
+              onTap: () => _makeCall(pPhone), 
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  const Icon(Icons.people_outline, size: 9, color: Colors.grey),
-                  const SizedBox(width: 1),
+                  const Icon(Icons.family_restroom_rounded, size: 14, color: Colors.grey),
+                  const SizedBox(width: 5),
                   Flexible(
                     child: Text(
                       "$pName($pPhone)",
                       style: const TextStyle(
-                        fontSize: 9,
+                        fontSize: 14, 
                         color: Colors.orange,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.underline,
                       ),
                       textAlign: TextAlign.left,
                       overflow: TextOverflow.ellipsis,
@@ -885,19 +884,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           GestureDetector(
             onTap: () => _showStudentDetails(s),
             child: Container(
-              padding: const EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.only(left: 10),
               child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
+                    Icons.arrow_circle_right_outlined, 
+                    size: 26, 
                     color: Colors.indigo,
                   ),
                   Text(
-                    "상세",
+                    "상세보기",
                     style: TextStyle(
-                      fontSize: 6,
+                      fontSize: 9, 
                       color: Colors.indigo,
                       fontWeight: FontWeight.bold,
                     ),
@@ -917,40 +916,40 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
+        height: MediaQuery.of(context).size.height * 0.9,
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
         child: Column(
           children: [
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Container(
-              width: 40,
-              height: 4,
+              width: 50,
+              height: 5,
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(3),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     "학생 상세 정보",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold), 
                   ),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       _showEditDialog(s);
                     },
-                    icon: const Icon(Icons.edit_note, size: 22),
+                    icon: const Icon(Icons.edit_note, size: 28), 
                     label: const Text(
                       "수정",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                 ],
@@ -959,15 +958,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
+                  horizontal: 24,
+                  vertical: 16,
                 ),
                 children: [
                   Center(
                     child: Column(
                       children: [
                         CircleAvatar(
-                          radius: 30,
+                          radius: 40, 
                           backgroundColor: s['gender'] == '남자'
                               ? Colors.blue.shade50
                               : Colors.pink.shade50,
@@ -976,18 +975,18 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                             color: s['gender'] == '남자'
                                 ? Colors.blue
                                 : Colors.pink,
-                            size: 36,
+                            size: 48, 
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 16),
                         Text(
                           s['name'],
                           style: const TextStyle(
-                            fontSize: 24,
+                            fontSize: 30, 
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -996,13 +995,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                               Colors.indigo.shade50,
                               Colors.indigo,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             _buildBadge(
                               "${s['cell']}셀",
                               Colors.teal.shade50,
                               Colors.teal,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             _buildBadge(
                               s['group'] == 'B'
                                   ? (s['role'] == '새친구' ? "새친구" : "집중케어")
@@ -1017,40 +1016,40 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   _detailGroup("📅 신앙 관리 현황", [
                     _detailItem(
                       "📅 첫 방문일",
                       s['firstVisitDate'],
-                      icon: Icons.calendar_today_rounded,
+                      icon: Icons.event_available_rounded, 
                     ),
                     _detailItem(
                       "👣 신앙경험",
                       s['churchExperience'],
-                      icon: Icons.history_edu_rounded,
+                      icon: Icons.auto_stories_rounded, 
                     ),
                     _detailItem(
                       "🛡️ 세례상태",
                       s['baptismStatus'] ??
                           (s['isBaptized'] == true ? '세례' : '미세례'),
-                      icon: Icons.verified_user_rounded,
+                      icon: Icons.verified_user_rounded, 
                     ),
                     _detailItem(
                       "📢 인도자",
                       s['evangelist'],
-                      icon: Icons.campaign_rounded,
+                      icon: Icons.record_voice_over_rounded, 
                     ),
                     _detailItem(
                       "📊 누적출석",
                       "${s['attendanceCount'] ?? 0}회",
-                      icon: Icons.bar_chart_rounded,
+                      icon: Icons.analytics_rounded, 
                     ),
                   ]),
                   _detailGroup("📍 기본 인적 사항", [
                     _detailItem(
                       "📱 본인전화",
                       s['phone'],
-                      icon: Icons.phone_android,
+                      icon: Icons.smartphone_rounded, 
                       isPhone: true,
                     ),
                     _detailItem(
@@ -1066,12 +1065,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     _detailItem(
                       "🏠 거주주소",
                       s['address'],
-                      icon: Icons.home_rounded,
+                      icon: Icons.location_on_rounded, 
                     ),
                     _detailItem(
                       "🧠 MBTI",
                       s['mbti'],
-                      icon: Icons.psychology_rounded,
+                      icon: Icons.psychology_alt_rounded, 
                     ),
                   ]),
                   _detailGroup("👨‍👩‍👧 가족 및 보호자 정보", [
@@ -1083,13 +1082,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     _detailItem(
                       "📞 보호자번호",
                       s['parentPhone'],
-                      icon: Icons.phone_rounded,
-                      isPhone: true,
+                      icon: Icons.phone_in_talk_rounded, 
+                      isPhone: true, 
                     ),
                     _detailItem(
                       "⛪ 부모님 출석교회",
                       s['churchName'],
-                      icon: Icons.church_rounded,
+                      icon: Icons.account_balance_rounded, 
                     ),
                     _detailItem(
                       "🧬 형제관계",
@@ -1099,31 +1098,31 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     _detailItem(
                       "🤝 교회친구",
                       s['churchFriends'],
-                      icon: Icons.group_rounded,
+                      icon: Icons.people_alt_rounded, 
                     ),
                   ]),
                   if (s['notes'] != null || s['remarks'] != null)
                     _detailGroup("📝 관리 및 비고", [
                       Text(
                         s['notes'] ?? s['remarks'] ?? "",
-                        style: const TextStyle(fontSize: 14, height: 1.5),
+                        style: const TextStyle(fontSize: 16, height: 1.6), 
                       ),
                     ]),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 30),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey.shade100,
                       foregroundColor: Colors.black87,
                       elevation: 0,
-                      minimumSize: const Size(double.infinity, 48),
+                      minimumSize: const Size(double.infinity, 56), 
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: const Text(
                       "닫기",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -1165,28 +1164,37 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     showDialog(
       context: context,
       builder: (dialogCtx) {
-        // ✅ context 가드를 위해 미리 확보
         final outerNavigator = Navigator.of(context);
         final innerMessenger = ScaffoldMessenger.of(context);
         
         return StatefulBuilder(
           builder: (stfCtx, setDialogState) => AlertDialog(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(20),
             ),
             title: Text(
               "${s['name'] ?? '학생'} 정보 수정",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             content: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.9,
+              width: MediaQuery.of(context).size.width * 0.95,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _editField("이름", nameController),
-                    _editField("본인 전화", phoneController),
-                    _editField("생년월일", birthDateController),
+                    _editField(
+                      "본인 전화", 
+                      phoneController, 
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], // ✅ 숫자와 하이픈만
+                    ),
+                    _editField(
+                      "생년월일", 
+                      birthDateController,
+                      keyboardType: TextInputType.datetime,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], // ✅ 숫자와 구분자만
+                    ),
                     _dropdownField(
                       "성별",
                       currentGender,
@@ -1199,7 +1207,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       roleOptions,
                       (val) => setDialogState(() => currentRole = val!),
                     ),
-                    _editField("첫 방문일", firstVisitDateController),
+                    _editField(
+                      "첫 방문일", 
+                      firstVisitDateController,
+                      keyboardType: TextInputType.datetime,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], // ✅ 숫자와 구분자만
+                    ),
                     _editField("인도자", evangelistController),
                     _dropdownField(
                       "신앙경험",
@@ -1209,9 +1222,14 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                     ),
                     _editField("학교", schoolController),
                     _editField("주소", addressController),
-                    const Divider(height: 24),
+                    const Divider(height: 32),
                     _editField("보호자 성함", parentNameController),
-                    _editField("보호자 전화", parentPhoneController),
+                    _editField(
+                      "보호자 전화", 
+                      parentPhoneController,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], // ✅ 숫자와 하이픈만
+                    ),
                     _editField("부모님 출석교회", churchNameController),
                     _dropdownField(
                       "세례 상태",
@@ -1230,7 +1248,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(stfCtx),
-                child: const Text("취소"),
+                child: const Text("취소", style: TextStyle(fontSize: 16)),
               ),
               ElevatedButton(
                 onPressed: () async {
@@ -1261,22 +1279,17 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           'updatedAt': FieldValue.serverTimestamp(),
                         });
                     
-                    // ✅ context.mounted 체크
                     if (!context.mounted) return;
-                    
-                    // 미리 확보한 navigator 사용
                     outerNavigator.pop();
-                    
                     await _loadInitialData();
-                    
                     innerMessenger.showSnackBar(
-                      const SnackBar(content: Text("저장되었습니다.")),
+                      const SnackBar(content: Text("저장되었습니다.", style: TextStyle(fontSize: 14))),
                     );
                   } catch (e) {
                     innerMessenger.showSnackBar(SnackBar(content: Text("오류: $e")));
                   }
                 },
-                child: const Text("저장"),
+                child: const Text("저장", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -1285,25 +1298,30 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
+  // ✅ 유효성 검사 및 키보드 타입을 지원하도록 수정된 헬퍼 함수
   Widget _editField(
     String label,
     TextEditingController controller, {
     int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        style: const TextStyle(fontSize: 13),
+        keyboardType: keyboardType, // ✅ 키보드 타입 설정 (숫자패드 등)
+        inputFormatters: inputFormatters, // ✅ 입력 제한 설정 (문자 입력 방지)
+        style: const TextStyle(fontSize: 15),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(fontSize: 12),
+          labelStyle: const TextStyle(fontSize: 14),
           border: const OutlineInputBorder(),
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 10,
+            horizontal: 12,
+            vertical: 14,
           ),
         ),
       ),
@@ -1317,20 +1335,20 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     ValueChanged<String?>? onChanged,
   ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: DropdownButtonFormField<String>(
         initialValue: value, 
-        style: const TextStyle(fontSize: 13, color: Colors.black),
+        style: const TextStyle(fontSize: 15, color: Colors.black),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(fontSize: 12),
+          labelStyle: const TextStyle(fontSize: 14),
           border: const OutlineInputBorder(),
           filled: onChanged == null,
           fillColor: onChanged == null ? Colors.grey.shade100 : null,
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 8,
+            horizontal: 12,
+            vertical: 10,
           ),
         ),
         items: options
@@ -1343,19 +1361,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Widget _detailGroup(String title, List<Widget> children) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
             style: const TextStyle(
-              fontSize: 15,
+              fontSize: 18, 
               fontWeight: FontWeight.bold,
               color: Colors.indigo,
             ),
           ),
-          const Divider(height: 16, thickness: 1),
+          const Divider(height: 20, thickness: 1.5),
           ...children,
         ],
       ),
@@ -1372,33 +1390,33 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         ? "정보 없음"
         : value.toString();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16, color: Colors.indigo.shade300),
-            const SizedBox(width: 8),
+            Icon(icon, size: 20, color: Colors.indigo.shade300), 
+            const SizedBox(width: 10),
           ],
           SizedBox(
-            width: 80,
+            width: 100, 
             child: Text(
               label,
               style: const TextStyle(
                 color: Colors.grey,
-                fontSize: 12,
+                fontSize: 14, 
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: GestureDetector(
               onTap: isPhone && val != "정보 없음" ? () => _makeCall(val) : null,
               child: Text(
                 val,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 16, 
                   fontWeight: FontWeight.w600,
                   color: isPhone && val != "정보 없음"
                       ? Colors.blue
@@ -1417,15 +1435,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
 
   Widget _buildBadge(String label, Color bgColor, Color textColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 13, 
           color: textColor,
           fontWeight: FontWeight.bold,
         ),
