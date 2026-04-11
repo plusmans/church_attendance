@@ -16,8 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false; // 비밀번호 숨김/표시 상태
 
   Future<void> _login() async {
-    String phoneNumber = _phoneController.text.trim();
-    String password = _passwordController.text.trim();
+    final String phoneNumber = _phoneController.text.trim();
+    final String password = _passwordController.text.trim();
 
     if (phoneNumber.isEmpty || password.isEmpty) {
       _showSnackBar('전화번호와 비밀번호를 입력해주세요.');
@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 💡 입력받은 전화번호 뒤에 @sungmoon.com 자동 결합
-      String emailFormat = phoneNumber.contains('@')
+      final String emailFormat = phoneNumber.contains('@')
           ? phoneNumber
           : '$phoneNumber@sungmoon.com';
 
@@ -49,12 +49,16 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       _showSnackBar('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _showSnackBar(String message) {
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -67,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     // 모바일 화면 크기에 따른 유동적인 디자인을 위한 미디어 쿼리
-    final size = MediaQuery.of(context).size;
+    final Size size = MediaQuery.of(context).size;
 
     return Scaffold(
       // 모바일 앱 느낌을 주는 부드러운 배경색
@@ -109,7 +113,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        // ✅ Lint: withOpacity -> withValues 대체
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 15,
                         offset: const Offset(0, 5),
                       ),
@@ -184,19 +189,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // 3. ✅ 로그인 버튼 (크기 최소화: 너비 50%, 높이 46)
                 SizedBox(
-                  width: size.width * 0.5, // 가로 너비를 화면의 50%로 더 축소
-                  height: 46, // 높이를 50에서 46으로 더 슬림하게 조정
+                  width: size.width * 0.5,
+                  height: 46,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                       foregroundColor: Colors.white,
-                      elevation: 1, // 그림자 농도 조절
-                      shadowColor: Colors.teal.withOpacity(0.2),
+                      elevation: 1,
+                      // ✅ Lint: withOpacity -> withValues 대체
+                      shadowColor: Colors.teal.withValues(alpha: 0.2),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          23,
-                        ), // 버튼 높이의 절반으로 설정하여 완전한 라운드 형태
+                        borderRadius: BorderRadius.circular(23),
                       ),
                     ),
                     child: _isLoading
@@ -211,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text(
                             '로그인하기',
                             style: TextStyle(
-                              fontSize: 15, // 폰트 크기 살짝 조정
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

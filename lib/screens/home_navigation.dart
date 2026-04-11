@@ -200,7 +200,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
             },
           ),
 
-          // 💡 [추가] 로그아웃 버튼
+          // 💡 로그아웃 버튼
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
@@ -222,7 +222,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
                     _cheerMessage,
                     style: TextStyle(
                       fontSize: 7.5,
-                      color: Colors.white.withOpacity(0.9),
+                      // ✅ Lint: withOpacity -> withValues 대체 (alpha: 0.9)
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w300,
                       letterSpacing: -0.5,
                     ),
@@ -245,7 +246,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
                           vertical: 0,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          // ✅ Lint: withOpacity -> withValues 대체 (alpha: 0.15)
+                          color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(3),
                         ),
                         child: Text(
@@ -281,7 +283,9 @@ class _HomeNavigationState extends State<HomeNavigation> {
               onTap: (index) {
                 setState(() {
                   _selectedIndex = index;
-                  if (index != 1) _autoSelectedCell = null;
+                  if (index != 1) {
+                    _autoSelectedCell = null;
+                  }
                   _buildScreens();
                 });
               },

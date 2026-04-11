@@ -79,7 +79,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Future<void> _loadMyPrayer() async {
     try {
-      var doc = await FirebaseFirestore.instance
+      final doc = await FirebaseFirestore.instance
           .collection('artifacts')
           .doc(appId)
           .collection('public')
@@ -90,7 +90,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
       if (mounted) {
         if (doc.exists) {
-          List<dynamic> contentList = doc.data()?['content'] ?? [];
+          // ✅ .get('field')를 사용하여 cast 경고와 Object? 에러를 동시에 피함
+          final List<dynamic> contentList = doc.get('content') ?? [];
           setState(() {
             _controllers = contentList.isNotEmpty
                 ? contentList
@@ -111,7 +112,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   Future<void> _loadCommonPrayer() async {
     try {
-      var doc = await FirebaseFirestore.instance
+      final doc = await FirebaseFirestore.instance
           .collection('artifacts')
           .doc(appId)
           .collection('public')
@@ -122,7 +123,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
       if (mounted) {
         if (doc.exists) {
-          List<dynamic> topics = doc.data()?['topics'] ?? [];
+          final List<dynamic> topics = doc.get('topics') ?? [];
           setState(() {
             _commonControllers = topics.isNotEmpty
                 ? topics
@@ -169,11 +170,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
   }
 
   Future<void> _savePrayer() async {
-    List<String> prayerList = _controllers
+    final List<String> prayerList = _controllers
         .map((c) => _cleanText(c.text.trim()))
         .where((text) => text.isNotEmpty)
         .toList();
-    if (prayerList.isEmpty) return;
+    if (prayerList.isEmpty) {
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       await FirebaseFirestore.instance
@@ -190,17 +193,20 @@ class _PrayerScreenState extends State<PrayerScreen> {
             'content': prayerList,
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('🙏 기도제목이 저장되었습니다.')));
+      }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
   Future<void> _saveCommonPrayer() async {
-    List<String> topicList = _commonControllers
+    final List<String> topicList = _commonControllers
         .map((c) => _cleanText(c.text.trim()))
         .where((text) => text.isNotEmpty)
         .toList();
@@ -219,18 +225,23 @@ class _PrayerScreenState extends State<PrayerScreen> {
             'updatedBy': widget.teacherName,
             'updatedAt': FieldValue.serverTimestamp(),
           });
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('📢 공동 기도제목 업데이트 완료.')));
+      }
     } finally {
-      if (mounted) setState(() => _isCommonSaving = false);
+      if (mounted) {
+        setState(() => _isCommonSaving = false);
+      }
     }
   }
 
   Future<void> _saveUrgentPrayer() async {
     final text = _urgentController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      return;
+    }
 
     setState(() => _isUrgentSaving = true);
     try {
@@ -249,12 +260,15 @@ class _PrayerScreenState extends State<PrayerScreen> {
           });
 
       _urgentController.clear();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('🚨 긴급 기도 요청이 공유되었습니다.')));
+      }
     } finally {
-      if (mounted) setState(() => _isUrgentSaving = false);
+      if (mounted) {
+        setState(() => _isUrgentSaving = false);
+      }
     }
   }
 
@@ -268,10 +282,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
           .collection('urgent_prayers')
           .doc(docId)
           .delete();
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('🗑️ 삭제되었습니다.')));
+      }
     } catch (e) {
       debugPrint("❌ 삭제 에러: $e");
     }
@@ -300,23 +315,21 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
     final allRequests = prayerSnapshot.docs
         .where(
-          (doc) =>
-              (doc.data() as Map<String, dynamic>)['month'] == _currentMonth,
+          (doc) => doc.get('month') == _currentMonth,
         )
         .toList();
 
     final urgentRequests = urgentSnapshot.docs
         .where(
-          (doc) =>
-              (doc.data() as Map<String, dynamic>)['month'] == _currentMonth,
+          (doc) => doc.get('month') == _currentMonth,
         )
         .toList();
 
     allRequests.sort((a, b) {
-      var aData = a.data() as Map<String, dynamic>;
-      var bData = b.data() as Map<String, dynamic>;
-      return (bData['updatedAt'] ?? Timestamp.now()).compareTo(
-        aData['updatedAt'] ?? Timestamp.now(),
+      final Timestamp? aTime = a.get('updatedAt');
+      final Timestamp? bTime = b.get('updatedAt');
+      return (bTime ?? Timestamp.now()).compareTo(
+        aTime ?? Timestamp.now(),
       );
     });
 
@@ -350,7 +363,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 borderRadius: pw.BorderRadius.circular(5),
               ),
               child: pw.Column(
-                // ✅ 문법 에러 수정: pw.CrossAxisAlignment.start 사용
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: _commonControllers
                     .map(
@@ -377,11 +389,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
               ),
               pw.Divider(color: PdfColors.red100),
               ...urgentRequests.map((u) {
-                final d = u.data() as Map<String, dynamic>;
                 return pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 8),
                   child: pw.Text(
-                    '• ${d['content']} (${d['authorName']} ${d['authorRole']})',
+                    '• ${u.get('content')} (${u.get('authorName')} ${u.get('authorRole')})',
                     style: pw.TextStyle(
                       font: font,
                       fontSize: 10,
@@ -389,7 +400,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     ),
                   ),
                 );
-              }).toList(),
+              }),
             ],
             pw.SizedBox(height: 25),
             pw.Text(
@@ -398,11 +409,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
             ),
             pw.Divider(thickness: 0.5),
             ...allRequests.asMap().entries.map((entry) {
-              final data = entry.value.data() as Map<String, dynamic>;
+              final doc = entry.value;
               final idx = entry.key + 1;
-              final name = _cleanName(data['teacherName'] ?? '교사');
-              final roleInfo = data['cell'] ?? '-';
-              final contents = data['content'] as List<dynamic>;
+              final name = _cleanName(doc.get('teacherName') ?? '교사');
+              final roleInfo = doc.get('cell') ?? '-';
+              final List<dynamic> contents = doc.get('content') ?? [];
 
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 12),
@@ -428,12 +439,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
                               ),
                             ),
                           ),
-                        )
-                        .toList(),
+                        ),
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ];
         },
       ),
@@ -548,20 +558,23 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 '🚨 긴급 기도 요청',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  fontSize: 15, // ✅ 제목 크기 확대 (13 -> 15)
                   color: Colors.red.shade900,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           TextField(
             controller: _urgentController,
             maxLines: null,
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 14), // ✅ 본문 크기 확대 (12 -> 14)
             decoration: InputDecoration(
               hintText: '긴급히 함께 기도할 제목을 입력하세요',
-              hintStyle: TextStyle(color: Colors.red.shade200, fontSize: 11),
+              hintStyle: TextStyle(
+                color: Colors.red.shade200,
+                fontSize: 13, // ✅ 힌트 크기 확대 (11 -> 13)
+              ),
               isDense: true,
               border: InputBorder.none,
             ),
@@ -590,7 +603,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       style: TextStyle(
                         color: Colors.red,
                         fontWeight: FontWeight.bold,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
             ),
@@ -610,25 +623,25 @@ class _PrayerScreenState extends State<PrayerScreen> {
           .collection('urgent_prayers')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
 
-        var docs = snapshot.data!.docs
+        final docs = snapshot.data!.docs
             .where(
-              (doc) =>
-                  (doc.data() as Map<String, dynamic>)['month'] ==
-                  _currentMonth,
+              (doc) => doc.get('month') == _currentMonth,
             )
             .toList();
-        if (docs.isEmpty)
+        if (docs.isEmpty) {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
+        }
 
         return SliverToBoxAdapter(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.red.shade100.withOpacity(0.3),
+              color: Colors.red.shade100.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -637,26 +650,25 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 const Text(
                   '🚩 최근 긴급 요청',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14, // ✅ 헤더 크기 확대 (12 -> 14)
                     fontWeight: FontWeight.bold,
                     color: Colors.red,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 ...docs.map((d) {
-                  var data = d.data() as Map<String, dynamic>;
-                  bool canDelete =
-                      _isAdmin || data['authorName'] == widget.teacherName;
+                  final bool canDelete =
+                      _isAdmin || d.get('authorName') == widget.teacherName;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Text(
-                            '• ${data['content']} (${data['authorName']})',
+                            '• ${d.get('content')} (${d.get('authorName')})',
                             style: const TextStyle(
-                              fontSize: 11,
+                              fontSize: 14, // ✅ 본문 크기 확대 (11 -> 14)
                               color: Colors.black87,
                             ),
                           ),
@@ -667,13 +679,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
                             child: const Icon(
                               Icons.close,
                               color: Colors.redAccent,
-                              size: 12,
+                              size: 14,
                             ),
                           ),
                       ],
                     ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -757,7 +769,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.teal.shade900,
-                      fontSize: 13,
+                      fontSize: 15, // ✅ 제목 크기 확대 (13 -> 15)
                     ),
                   ),
                 ],
@@ -775,23 +787,19 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           if (_isAdmin)
-            ..._commonControllers
-                .asMap()
-                .entries
-                .map(
+            ..._commonControllers.asMap().entries.map(
                   (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6.0),
+                    padding: const EdgeInsets.only(bottom: 8.0),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: entry.value,
-                            // ✅ 자동 줄바꿈 처리 추가
                             maxLines: null,
                             keyboardType: TextInputType.multiline,
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 14),
                             decoration: InputDecoration(
                               isDense: true,
                               contentPadding: const EdgeInsets.symmetric(
@@ -806,7 +814,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                           icon: const Icon(
                             Icons.remove_circle,
                             color: Colors.redAccent,
-                            size: 16,
+                            size: 18,
                           ),
                           onPressed: () => _removeCommonField(entry.key),
                           padding: EdgeInsets.zero,
@@ -816,22 +824,25 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     ),
                   ),
                 )
-                .toList()
           else
             ..._commonControllers.asMap().entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '${entry.key + 1}. ${_cleanText(entry.value.text)}',
-                  style: TextStyle(fontSize: 12, color: Colors.teal.shade800),
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '${entry.key + 1}. ${_cleanText(entry.value.text)}',
+                      style: TextStyle(
+                        fontSize: 15, // ✅ 본문 크기 확대 (12 -> 15)
+                        color: Colors.teal.shade800,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
           if (_isAdmin) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              height: 30,
+              height: 34,
               child: ElevatedButton(
                 onPressed: _isCommonSaving ? null : _saveCommonPrayer,
                 style: ElevatedButton.styleFrom(
@@ -853,7 +864,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       )
                     : const Text(
                         '공동 기도제목 업데이트',
-                        style: TextStyle(fontSize: 11),
+                        style: TextStyle(fontSize: 13),
                       ),
               ),
             ),
@@ -869,12 +880,12 @@ class _PrayerScreenState extends State<PrayerScreen> {
       children: [
         const Text(
           '📝 나의 기도제목',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         TextButton.icon(
           onPressed: _addField,
           icon: const Icon(Icons.add_circle_outline, size: 16),
-          label: const Text('항목 추가', style: TextStyle(fontSize: 11)),
+          label: const Text('항목 추가', style: TextStyle(fontSize: 12)),
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             minimumSize: const Size(60, 30),
@@ -886,9 +897,9 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
   List<Widget> _buildInputFields() {
     return _controllers.asMap().entries.map((entry) {
-      int idx = entry.key;
+      final int idx = entry.key;
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -903,17 +914,17 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: entry.value,
                 maxLines: null,
-                style: const TextStyle(fontSize: 13),
+                style: const TextStyle(fontSize: 14),
                 decoration: const InputDecoration(
                   hintText: '내용을 입력하세요',
                   border: UnderlineInputBorder(),
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 6),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
                 ),
               ),
             ),
@@ -923,7 +934,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 icon: const Icon(
                   Icons.remove_circle_outline,
                   color: Colors.grey,
-                  size: 16,
+                  size: 18,
                 ),
                 onPressed: () => _removeField(idx),
                 constraints: const BoxConstraints(),
@@ -937,7 +948,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildSaveButton() {
     return SizedBox(
       width: double.infinity,
-      height: 42,
+      height: 44,
       child: ElevatedButton(
         onPressed: _isSaving ? null : _savePrayer,
         style: ElevatedButton.styleFrom(
@@ -957,7 +968,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
               )
             : const Text(
                 '저장 및 공유하기',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
       ),
     );
@@ -973,55 +984,54 @@ class _PrayerScreenState extends State<PrayerScreen> {
           .collection('prayer_requests')
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator()),
           );
+        }
 
-        var docs = snapshot.data!.docs
+        final docs = snapshot.data!.docs
             .where(
-              (doc) =>
-                  (doc.data() as Map<String, dynamic>)['month'] ==
-                  _currentMonth,
+              (doc) => doc.get('month') == _currentMonth,
             )
             .toList();
 
         docs.sort((a, b) {
-          var aData = a.data() as Map<String, dynamic>;
-          var bData = b.data() as Map<String, dynamic>;
-          return (bData['updatedAt'] ?? Timestamp.now()).compareTo(
-            aData['updatedAt'] ?? Timestamp.now(),
+          final Timestamp? aTime = a.get('updatedAt');
+          final Timestamp? bTime = b.get('updatedAt');
+          return (bTime ?? Timestamp.now()).compareTo(
+            aTime ?? Timestamp.now(),
           );
         });
 
-        if (docs.isEmpty)
+        if (docs.isEmpty) {
           return const SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.all(32.0),
               child: Center(
                 child: Text(
                   "등록된 기도제목이 없습니다.",
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
               ),
             ),
           );
+        }
 
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
-            var data = docs[index].data() as Map<String, dynamic>;
-            List<dynamic> contents = data['content'] ?? [];
+            final doc = docs[index];
+            final List<dynamic> contents = doc.get('content') ?? [];
             return Container(
-              // ✅ 선생님 목록 간의 간격 축소 (8 -> 4)
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), // ✅ 선생님별 카드 간격 확대
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 6,
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
@@ -1033,35 +1043,37 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   Row(
                     children: [
                       Text(
-                        '${index + 1}. ${_cleanName(data['teacherName'] ?? '교사')}',
+                        '${index + 1}. ${_cleanName(doc.get('teacherName') ?? '교사')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 18, // ✅ 17 -> 18로 확대
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Text(
-                        data['cell'] ?? '-',
+                        (doc.get('cell') ?? '-').toString(),
                         style: TextStyle(
                           color: Colors.teal.shade600,
-                          fontSize: 10,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                  // ✅ 이름/셀과 내용 사이의 간격 축소 (6 -> 2)
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 6),
                   ...contents.asMap().entries.map(
-                    (e) => Text(
-                      '${e.key + 1}. ${_cleanText(e.value.toString())}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black87,
-                        height: 1.3,
+                        (e) => Padding(
+                          padding: const EdgeInsets.only(top: 8), // ✅ 기도제목 항목 간 간격 충분히 확보
+                          child: Text(
+                            '${e.key + 1}. ${_cleanText(e.value.toString())}',
+                            style: const TextStyle(
+                              fontSize: 16, // ✅ 15 -> 16으로 확대
+                              color: Colors.black87,
+                              height: 1.5, // ✅ 줄 간격 확대
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
                 ],
               ),
             );
