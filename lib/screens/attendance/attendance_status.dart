@@ -56,11 +56,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   void _scrollToTop() {
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   String _normalizeName(dynamic rawName) {
@@ -159,14 +161,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final Map<String, Map<String, dynamic>> indv = {};
     final String selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
+    // 1. 학생 기본 명단 초기화 (방문일 기준)
     master.forEach((name, data) {
-      // ✅ 교사인 경우는 학생 통계에서 제외
       if (teacherNames.contains(name)) return;
-      
       if (_isFutureStudent(data['firstVisitDate'], selectedDateStr)) return;
       final String cell = (data['cell'] ?? '0').toString();
       final String group = (data['group'] ?? 'B').toString().trim().toUpperCase();
-      
       if (!baseStats.containsKey(cell)) {
         baseStats[cell] = {'id': cell, 'total': 0, 'present': 0, 'records': <String, dynamic>{}};
       }
@@ -179,35 +179,46 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       }
     });
 
+    // 2. ✅ 교사 기본 명단 초기화 (ID: 교사)
+    if (!baseStats.containsKey('교사')) {
+      baseStats['교사'] = {'id': '교사', 'total': teacherCount, 'present': 0, 'records': <String, dynamic>{}};
+    }
+    for (var tName in teacherNames) {
+      baseStats['교사']!['records'][tName] = {'status': '결석', 'role': '교사', 'cell': '교사'};
+    }
+
+    // 3. 실제 출석 기록 덮어쓰기 (문서 ID가 teachers_... 인지 확인)
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
       final Map<String, dynamic> records = Map<String, dynamic>.from(data['records'] ?? {});
       
+      // ✅ 사용자 요청에 따른 문서 ID 식별: teachers_YYYY-MM-DD
+      bool isTeacherDoc = doc.id.startsWith('teachers');
+
       records.forEach((rawName, info) {
         final String n = _normalizeName(rawName);
         final infoMap = Map<String, dynamic>.from(info);
         
-        bool isActuallyTeacher = teacherNames.contains(n) || doc.id.startsWith('teachers');
+        bool isActuallyTeacher = teacherNames.contains(n) || isTeacherDoc;
         String currentRole = isActuallyTeacher ? '교사' : '학생';
         String currentCell = isActuallyTeacher ? '교사' : (infoMap['cell']?.toString() ?? master[n]?['cell']?.toString() ?? '0');
 
         if (!isActuallyTeacher && _isFutureStudent(master[n]?['firstVisitDate'], selectedDateStr)) return;
-        if (isActuallyTeacher && infoMap['status'] == '출석') tP++;
 
-        if (doc.id.startsWith('teachers') || isActuallyTeacher) {
-          indv[n] = {...infoMap, 'name': rawName, 'cell': '교사', 'role': '교사'};
+        if (isActuallyTeacher) {
+          // 교사 레코드를 교사 전용 섹션에 할당
+          baseStats['교사']!['records'][n] = {...infoMap, 'role': '교사', 'cell': '교사'};
+          if (infoMap['status'] == '출석') tP++;
         } else {
           final String cellId = doc.id.split('셀')[0];
           if (!baseStats.containsKey(cellId)) baseStats[cellId] = {'id': cellId, 'total': 0, 'present': 0, 'records': <String, dynamic>{}};
 
           if (!baseStats[cellId]!['records'].containsKey(n)) {
             baseStats[cellId]!['records'][n] = {...infoMap, 'role': currentRole, 'cell': currentCell};
-            if (!isActuallyTeacher) {
-              sGT++; 
-              if ((infoMap['group'] ?? 'B').toString().trim().toUpperCase() == 'A') {
-                sT++;
-                baseStats[cellId]!['total'] = (baseStats[cellId]!['total'] as int) + 1;
-              }
+            sGT++; 
+            if ((infoMap['group'] ?? 'B').toString().trim().toUpperCase() == 'A') {
+              sT++;
+              baseStats[cellId]!['total'] = (baseStats[cellId]!['total'] as int) + 1;
             }
           } else {
             final existing = Map<String, dynamic>.from(baseStats[cellId]!['records'][n]);
@@ -217,45 +228,54 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       });
     }
 
+    // 4. 통계 최종 합산 및 정규화
     baseStats.forEach((cId, stat) {
       final Map<String, dynamic> records = Map<String, dynamic>.from(stat['records'] ?? {});
+      int presentInCell = 0;
       records.forEach((name, info) {
         final infoMap = Map<String, dynamic>.from(info);
         final String n = _normalizeName(name);
         
-        bool isTeacher = teacherNames.contains(n) || infoMap['role'] == '교사';
+        bool isTeacher = teacherNames.contains(n) || infoMap['role'] == '교사' || cId == '교사';
         final String role = isTeacher ? '교사' : '학생';
         final String group = (infoMap['group'] ?? 'B').toString().trim().toUpperCase();
         final String displayCell = isTeacher ? '교사' : cId;
         
         indv[n] = {...infoMap, 'name': name, 'cell': displayCell, 'role': role};
 
-        if (role != '교사') {
-          if (infoMap['status'] == '출석') {
+        if (infoMap['status'] == '출석') {
+          presentInCell++;
+          if (role != '교사') {
             sP++;
-            stat['present'] = (stat['present'] as int) + 1;
             final String g = (infoMap['grade'] ?? '1학년').toString();
             final String sex = (infoMap['gender'] ?? '남자').toString();
             if (_gradeStats.containsKey(g)) _gradeStats[g]!['p'] = (_gradeStats[g]!['p'] ?? 0) + 1;
             if (_genderStats.containsKey(sex)) _genderStats[sex]!['p'] = (_genderStats[sex]!['p'] ?? 0) + 1;
           }
-          if (group == 'A') {
-            final String g = (infoMap['grade'] ?? '1학년').toString();
-            final String sex = (infoMap['gender'] ?? '남자').toString();
-            if (_gradeStats.containsKey(g)) _gradeStats[g]!['t'] = (_gradeStats[g]!['t'] ?? 0) + 1;
-            if (_genderStats.containsKey(sex)) _genderStats[sex]!['t'] = (_genderStats[sex]!['t'] ?? 0) + 1;
-          }
         }
+
+        if (role != '교사' && group == 'A') {
+          final String g = (infoMap['grade'] ?? '1학년').toString();
+          final String sex = (infoMap['gender'] ?? '남자').toString();
+          if (_gradeStats.containsKey(g)) _gradeStats[g]!['t'] = (_gradeStats[g]!['t'] ?? 0) + 1;
+          if (_genderStats.containsKey(sex)) _genderStats[sex]!['t'] = (_genderStats[sex]!['t'] ?? 0) + 1;
+        }
+
         if (infoMap['status'] != '출석' && group == 'A' && role != '교사') {
           _absenceReasonCounts[infoMap['reason'] ?? '연락x'] = (_absenceReasonCounts[infoMap['reason'] ?? '연락x'] ?? 0) + 1;
         }
       });
-      stat['present'] = stat['present'] ?? 0;
+      stat['present'] = presentInCell;
       _cellAverages[cId] = stat['total'] > 0 ? stat['present'] / stat['total'] : 0.0;
     });
 
     setState(() {
-      _cellStats = Map.fromEntries(baseStats.entries.toList()..sort((a, b) => (int.tryParse(a.key) ?? 99).compareTo(int.tryParse(b.key) ?? 99)));
+      // 숫자 셀 정렬 후 교사 섹션을 마지막에 배치 (99 처리로 인해 자동으로 10셀 뒤로 감)
+      _cellStats = Map.fromEntries(baseStats.entries.toList()..sort((a, b) {
+        if (a.key == '교사') return 1;
+        if (b.key == '교사') return -1;
+        return (int.tryParse(a.key) ?? 99).compareTo(int.tryParse(b.key) ?? 99);
+      }));
       _studentPresent = sP;
       _studentTotal = sT;
       _studentGrandTotal = sGT;
@@ -269,22 +289,14 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final Map<String, Map<String, int>> dateSummary = {};
     final Map<String, Map<String, dynamic>> indv = {};
 
-    // ✅ [수정] 오직 현재 날짜 기준 방문일 지난 학생 중 group 'A'만 재적으로 필터링
-    // ✅ [수정] 학생 명단에 이름이 있더라도 교사 명단(teacherNames)에 있으면 학생 통계에서 제외
     final String todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     int currentTotalA = 0;
     int currentGrandTotal = 0;
 
     master.forEach((name, data) {
-      // 1. 교사인 이름은 학생 집계에서 아예 제외 (중요!)
       if (teacherNames.contains(name)) return;
-      
-      // 2. 미래에 올 학생 제외
       if (_isFutureStudent(data['firstVisitDate'], todayStr)) return;
-      
       currentGrandTotal++;
-      
-      // 3. 오직 그룹 A인 학생만 재적 수치로 인정
       String group = (data['group'] ?? 'B').toString().trim().toUpperCase();
       if (group == 'A') {
         currentTotalA++;
@@ -716,7 +728,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     if (isT) {
       return Wrap(spacing: 8, runSpacing: 8, children: entries.map((i) {
         final bool isP = i.value['status'] == '출석';
-        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: i.value['status'] == '출석' ? FontWeight.bold : FontWeight.normal)));
+        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList());
     }
     final gA = entries.where((i) => (i.value['group'] ?? 'A') == 'A').toList();
