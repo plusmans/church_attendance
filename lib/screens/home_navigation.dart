@@ -38,7 +38,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
     "선생님의 수고를 응원해요! ✨",
     "우리 아이들의 소중한 목자님! 🌱",
     "기쁨이 가득한 하루 되세요! 😊",
-    "기도로 함께하는 동역자입니다! ❤️",
+    "기대로 함께하는 동역자입니다! ❤️",
   ];
 
   late List<Widget> _screens;
@@ -145,12 +145,14 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 42,
+        // ✅ 상단 앱바 높이 확대 (기존 42 -> 56)
+        toolbarHeight: 56,
         title: Text(
           appBarTitle,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            // ✅ 타이틀 글자 크기 확대 (기존 14 -> 18)
+            fontSize: 18,
             letterSpacing: -0.8,
           ),
         ),
@@ -164,7 +166,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
             IconButton(
               icon: const Icon(
                 Icons.people_alt_rounded,
-                size: 20,
+                // ✅ 아이콘 크기 확대 (기존 20 -> 24)
+                size: 24,
                 color: Colors.white70,
               ),
               tooltip: '교사 관리',
@@ -182,7 +185,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
           IconButton(
             icon: const Icon(
               Icons.lock_reset_rounded,
-              size: 20,
+              // ✅ 아이콘 크기 확대 (기존 20 -> 24)
+              size: 24,
               color: Colors.white70,
             ),
             tooltip: '비밀번호 변경',
@@ -204,7 +208,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
           IconButton(
             icon: const Icon(
               Icons.logout_rounded,
-              size: 19,
+              // ✅ 아이콘 크기 확대 (기존 19 -> 24)
+              size: 24,
               color: Colors.white70,
             ),
             tooltip: '로그아웃',
@@ -221,39 +226,40 @@ class _HomeNavigationState extends State<HomeNavigation> {
                   Text(
                     _cheerMessage,
                     style: TextStyle(
-                      fontSize: 7.5,
-                      // ✅ Lint: withOpacity -> withValues 대체 (alpha: 0.9)
+                      // ✅ 응원 메시지 크기 확대 (기존 7.5 -> 10)
+                      fontSize: 10,
                       color: Colors.white.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w300,
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 2),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '${widget.teacherName} ${isSuperAdmin ? '사역자님' : '교사'}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          // ✅ 교사 성함 크기 확대 (기존 10 -> 13)
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 3,
-                          vertical: 0,
+                          horizontal: 4,
+                          vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          // ✅ Lint: withOpacity -> withValues 대체 (alpha: 0.15)
                           color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           displayRole,
                           style: const TextStyle(
-                            fontSize: 7,
+                            // ✅ 역할 텍스트 크기 확대 (기존 7 -> 9)
+                            fontSize: 9,
                             color: Colors.white,
                             fontWeight: FontWeight.w400,
                           ),
@@ -277,7 +283,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
         ),
         child: SafeArea(
           child: SizedBox(
-            height: 46,
+            height: 60,
             child: BottomNavigationBar(
               currentIndex: _selectedIndex,
               onTap: (index) {
@@ -293,16 +299,16 @@ class _HomeNavigationState extends State<HomeNavigation> {
               unselectedItemColor: Colors.grey.shade400,
               selectedLabelStyle: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 9,
+                fontSize: 11,
               ),
               unselectedLabelStyle: const TextStyle(
                 fontWeight: FontWeight.w500,
-                fontSize: 9,
+                fontSize: 11,
               ),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
-              iconSize: 18,
+              iconSize: 22,
               items: [
                 BottomNavigationBarItem(
                   icon: Icon(
