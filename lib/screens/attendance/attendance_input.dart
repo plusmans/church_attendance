@@ -84,7 +84,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : (int.tryParse(_currentCell) ?? _currentCell).toString();
       String docId = _currentCell == 'teachers' ? "teachers_$dateStr" : "$cleanCellNum셀_$dateStr";
 
-      var doc = await FirebaseFirestore.instance.collection('attendance').doc(docId).get();
+      var attendanceDoc = await FirebaseFirestore.instance.collection('attendance').doc(docId).get();
+      
       QuerySnapshot masterSnap;
       if (_currentCell == 'teachers') {
         masterSnap = await FirebaseFirestore.instance.collection('teachers').get();
@@ -107,34 +108,52 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       _customReasonControllers.clear();
       _initialStatusMap.clear();
 
-      if (doc.exists) {
-        Map<String, dynamic> records = Map<String, dynamic>.from(doc.data()?['records'] ?? {});
+      if (attendanceDoc.exists) {
+        Map<String, dynamic> records = Map<String, dynamic>.from(attendanceDoc.data()?['records'] ?? {});
+        Set<String> allMemberNames = {...records.keys, ...masterInfoMap.keys};
+
+        Map<String, Map<String, dynamic>> finalData = {};
+        for (var name in allMemberNames) {
+          if (records.containsKey(name)) {
+            var rec = Map<String, dynamic>.from(records[name]);
+            finalData[name] = rec;
+            _initialStatusMap[name] = rec['status'] ?? '결석';
+          } else {
+            var mData = masterInfoMap[name]!;
+            finalData[name] = {
+              'status': '결석', 'reason': '연락x', 'customReason': '',
+              'grade': mData['grade'] ?? '', 'role': mData['role'] ?? '',
+              'cell': mData['cell'] ?? cleanCellNum,
+              'group': _extractGroup(mData), 'docId': mData['docId'],
+              'gender': mData['gender'] ?? '남자',
+              'firstVisitDate': mData['firstVisitDate'] ?? '',
+              'evangelist': mData['evangelist'] ?? '',
+              'promotedAt': mData['promotedAt'] ?? '',
+              'school': mData['school'] ?? '',
+            };
+            _initialStatusMap[name] = '결석';
+          }
+          _customReasonControllers[name] = TextEditingController(text: finalData[name]!['customReason'] ?? '');
+        }
+
+        // ✅ 정렬: 그룹(A->B) 우선, 그 다음 이름순
+        List<String> sortedNames = allMemberNames.toList();
+        sortedNames.sort((a, b) {
+          String gA = (finalData[a]?['group'] ?? 'B').toString().toUpperCase();
+          String gB = (finalData[b]?['group'] ?? 'B').toString().toUpperCase();
+          if (gA != gB) return gA.compareTo(gB);
+          return a.compareTo(b);
+        });
+
         setState(() {
-          _memberNames = records.keys.toList()..sort();
-          _attendanceData = records.map((key, value) {
-            var valMap = Map<String, dynamic>.from(value);
-            String name = key.toString().trim();
-            if (masterInfoMap.containsKey(name)) {
-              valMap['docId'] = masterInfoMap[name]!['docId'];
-              valMap['grade'] = valMap['grade'] ?? masterInfoMap[name]!['grade'];
-              valMap['group'] = valMap['group'] ?? _extractGroup(masterInfoMap[name]!);
-              valMap['role'] = valMap['role'] ?? masterInfoMap[name]!['role'];
-              valMap['cell'] = valMap['cell'] ?? masterInfoMap[name]!['cell'];
-              valMap['gender'] = valMap['gender'] ?? masterInfoMap[name]!['gender'];
-              valMap['firstVisitDate'] = valMap['firstVisitDate'] ?? masterInfoMap[name]!['firstVisitDate'];
-              valMap['evangelist'] = valMap['evangelist'] ?? masterInfoMap[name]!['evangelist'];
-              valMap['promotedAt'] = valMap['promotedAt'] ?? masterInfoMap[name]!['promotedAt'];
-              valMap['school'] = valMap['school'] ?? masterInfoMap[name]!['school'];
-            }
-            _initialStatusMap[key] = valMap['status'] ?? '결석';
-            _customReasonControllers[key] = TextEditingController(text: valMap['customReason'] ?? '');
-            return MapEntry(key, valMap);
-          });
+          _memberNames = sortedNames;
+          _attendanceData = finalData;
         });
       } else {
         Map<String, Map<String, dynamic>> temp = {};
         List<String> names = [];
         String defStatus = _currentCell == 'teachers' ? '출석' : '결석';
+        
         masterInfoMap.forEach((name, mData) {
           names.add(name);
           _initialStatusMap[name] = defStatus;
@@ -151,8 +170,17 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             'school': mData['school'] ?? '',
           };
         });
+
+        // ✅ 정렬: 그룹(A->B) 우선, 그 다음 이름순
+        names.sort((a, b) {
+          String gA = (temp[a]?['group'] ?? 'B').toString().toUpperCase();
+          String gB = (temp[b]?['group'] ?? 'B').toString().toUpperCase();
+          if (gA != gB) return gA.compareTo(gB);
+          return a.compareTo(b);
+        });
+        
         setState(() { 
-          _memberNames = names..sort(); 
+          _memberNames = names; 
           _attendanceData = temp; 
         });
       }
@@ -248,6 +276,14 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           };
           _initialStatusMap[finalName] = '결석'; 
           _customReasonControllers[finalName] = TextEditingController();
+          
+          // 추가 후 다시 정렬
+          _memberNames.sort((a, b) {
+            String gA = (_attendanceData[a]?['group'] ?? 'B').toString().toUpperCase();
+            String gB = (_attendanceData[b]?['group'] ?? 'B').toString().toUpperCase();
+            if (gA != gB) return gA.compareTo(gB);
+            return a.compareTo(b);
+          });
         });
       },
     ));
@@ -274,6 +310,8 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                 String name = _memberNames[index]; 
                 var data = _attendanceData[name]!; 
                 bool isP = data['status'] == '출석';
+                String group = (data['group'] ?? 'B').toString();
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
@@ -284,7 +322,31 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                   child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), child: Column(children: [
                     Row(children: [
                       SizedBox(width: 24, child: Text('${index + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
-                      Expanded(child: Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))), 
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            if (!isTMode) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: group == 'A' ? Colors.blue.shade50 : Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  group,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: group == 'A' ? Colors.blue.shade700 : Colors.orange.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ), 
                       _miniStatusToggle(name, isP, mainColor)
                     ]),
                     if (!isP) ...[
@@ -307,7 +369,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     final bool isGrade = role.contains('학년담당');
     List<String> allowed = isFull ? List.generate(10, (i) => '${i + 1}') : (isGrade ? (gradeCellMap[role] ?? gradeCellMap[widget.teacherGrade.trim()] ?? []) : [_currentCell]);
     return Container(
-      // ✅ 상단 선택 바 패딩 확대
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Colors.grey.shade100, width: 1.5))),
       child: Row(children: [
@@ -317,7 +378,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             child: Row(children: [
               Icon(Icons.calendar_today, size: 16, color: mainColor), 
               const SizedBox(width: 8), 
-              // ✅ 날짜 텍스트 크기 확대
               Text(DateFormat('yyyy. MM. dd').format(_targetDate), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)), 
               Icon(Icons.arrow_drop_down, size: 24, color: mainColor)
             ])
@@ -325,14 +385,12 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12), 
-          // ✅ 셀 선택 박스 높이 확대
           height: 38, 
           decoration: BoxDecoration(color: mainColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: mainColor.withValues(alpha: 0.2))),
           child: DropdownButtonHideUnderline(
             child: (isFull || isGrade) ? DropdownButton<String>(
               value: _currentCell, 
               iconSize: 22, 
-              // ✅ 드롭다운 글자 크기 확대
               items: [
                 if (isFull) const DropdownMenuItem(value: 'teachers', child: Text('교사전체', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))), 
                 ...allowed.map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))))
@@ -374,7 +432,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
 
   Widget _buildReasonDropdown(String n, Map<String, dynamic> d) { 
     return Container(
-      // ✅ 결석 사유 드롭다운 높이 확대
       height: 42, 
       padding: const EdgeInsets.symmetric(horizontal: 10), 
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.shade100, width: 1.2)), 
@@ -382,7 +439,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         child: DropdownButton<String>(
           isExpanded: true, 
           value: _absenceReasons.contains(d['reason']) ? d['reason'] : '기타', 
-          // ✅ 결석 사유 글자 크기 확대
           items: _absenceReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 15)))).toList(), 
           onChanged: (v) { 
             if (v != null) {
@@ -432,7 +488,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), 
         decoration: BoxDecoration(color: s ? c : Colors.grey.shade100, borderRadius: BorderRadius.circular(8), border: Border.all(color: s ? c : Colors.grey.shade200)), 
-        // ✅ 출석/결석 버튼 글자 크기 확대
         child: Text(l, style: TextStyle(color: s ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13))
       )
     ); 
