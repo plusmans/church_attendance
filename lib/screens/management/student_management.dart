@@ -257,37 +257,31 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         .where((s) => s['group'] == 'B' && s['role'] != '새친구')
         .toList();
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       children: [
         _buildBirthdayBanner(),
         _buildControlBar(filteredList.length),
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            children: [
-              if (groupBNew.isNotEmpty) ...[
-                _buildGroupHeader("🐣 신규 등록 (새친구)", Colors.orange),
-                ...groupBNew.asMap().entries.map(
-                  (e) => _buildStudentOneLineRow(e.value, e.key + 1),
-                ),
-              ],
-              if (groupBOld.isNotEmpty) ...[
-                _buildGroupHeader("🔍 장기 결석 및 특별 관리", Colors.redAccent),
-                ...groupBOld.asMap().entries.map(
-                  (e) => _buildStudentOneLineRow(e.value, e.key + 1),
-                ),
-              ],
-              if (groupA.isNotEmpty) ...[
-                _buildGroupHeader("💎 정규 명단 (A그룹)", Colors.indigo),
-                ...groupA.asMap().entries.map(
-                  (e) => _buildStudentOneLineRow(e.value, e.key + 1),
-                ),
-              ],
-              _buildBottomAddButton(),
-              const SizedBox(height: 50),
-            ],
+        if (groupBNew.isNotEmpty) ...[
+          _buildGroupHeader("🐣 신규 등록 (새친구)", Colors.orange),
+          ...groupBNew.asMap().entries.map(
+            (e) => _buildStudentOneLineRow(e.value, e.key + 1),
           ),
-        ),
+        ],
+        if (groupBOld.isNotEmpty) ...[
+          _buildGroupHeader("🔍 장기 결석 및 특별 관리", Colors.redAccent),
+          ...groupBOld.asMap().entries.map(
+            (e) => _buildStudentOneLineRow(e.value, e.key + 1),
+          ),
+        ],
+        if (groupA.isNotEmpty) ...[
+          _buildGroupHeader("💎 정규 명단 (A그룹)", Colors.indigo),
+          ...groupA.asMap().entries.map(
+            (e) => _buildStudentOneLineRow(e.value, e.key + 1),
+          ),
+        ],
+        _buildBottomAddButton(),
+        const SizedBox(height: 50),
       ],
     );
   }
@@ -615,8 +609,14 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
+  // ✅ [수정] 생일자 명단에 구분선 추가 및 학생/교사 분리 배치
   Widget _buildBirthdayBanner() {
     final list = _getBirthdayPeople();
+    
+    // 학생과 교사 데이터를 분리
+    final studentBirthdays = list.where((p) => p['type'] == '학생').toList();
+    final teacherBirthdays = list.where((p) => p['type'] == '교사').toList();
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(12, 14, 12, 6),
@@ -672,37 +672,64 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               ),
             ],
           ),
-          if (list.isNotEmpty)
+          
+          const SizedBox(height: 12),
+
+          // 1. 학생(아이들) 명단
+          if (studentBirthdays.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: studentBirthdays.map((p) => _buildBirthdayChip(p)).toList(),
+            ),
+
+          // 2. 구분선 (학생과 교사 둘 다 있을 때만 표시)
+          if (studentBirthdays.isNotEmpty && teacherBirthdays.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 10.0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: list
-                    .map(
-                      (p) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15), 
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          "${p['name']} ($_selectedBirthMonth/${p['birthDay']})", 
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12, 
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2), thickness: 1)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(Icons.star_rounded, color: Colors.white.withValues(alpha: 0.3), size: 14),
+                  ),
+                  Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2), thickness: 1)),
+                ],
               ),
             ),
+
+          // 3. 선생님 명단
+          if (teacherBirthdays.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: teacherBirthdays.map((p) => _buildBirthdayChip(p)).toList(),
+            ),
         ],
+      ),
+    );
+  }
+
+  // 생일자 칩 빌더 (중복 코드 방지)
+  Widget _buildBirthdayChip(Map<String, dynamic> p) {
+    String subInfo = p['type'] == '학생' ? "${p['cell']}셀" : "교사";
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15), 
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        "${p['name']} ($subInfo, $_selectedBirthMonth/${p['birthDay']})", 
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12, 
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -766,137 +793,166 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     String pPhone = (s['parentPhone'] ?? '-').toString();
     bool isNewFriend = s['role'] == '새친구';
     String cellBadge = "${s['cell']}셀";
-    final bool isCrisis =
-        (s['attendanceCount'] ?? 0) <= 1 || s['isCrisis'] == true;
+    final bool isCrisis = (s['attendanceCount'] ?? 0) <= 1 || s['isCrisis'] == true;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), 
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10), 
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 150, 
-            child: Row(
+            width: 28,
+            child: Text(
+              '$index',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade400,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          
+          Expanded(
+            child: Column(
               children: [
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    '$index',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade400,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          s['name'],
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16, 
-                            color: isNewFriend
-                                ? Colors.orange.shade800
-                                : Colors.black87,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              s['name'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16, 
+                                color: isNewFriend ? Colors.orange.shade800 : Colors.black87,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          overflow: TextOverflow.ellipsis,
+                          if (isCrisis)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Text("🔴", style: TextStyle(fontSize: 10)),
+                            ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.indigo.shade100),
+                            ),
+                            child: Text(
+                              cellBadge,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: Colors.indigo,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => _makeCall(phone),
+                      child: Text(
+                        phone,
+                        style: const TextStyle(
+                          fontSize: 15, 
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
-                      if (isCrisis)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4),
-                          child: Text("🔴", style: TextStyle(fontSize: 10)),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Text(
-                    cellBadge,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.blueGrey,
-                      fontWeight: FontWeight.bold,
                     ),
-                  ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.orange.shade100),
+                            ),
+                            child: const Text(
+                              "보호자",
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              pName,
+                              style: const TextStyle(
+                                fontSize: 14, 
+                                color: Color(0xFF555555),
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => _makeCall(pPhone),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.phone_in_talk_rounded, size: 12, color: Colors.orange),
+                          const SizedBox(width: 4),
+                          Text(
+                            pPhone,
+                            style: const TextStyle(
+                              fontSize: 14, 
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Expanded(
-            flex: 25,
-            child: GestureDetector(
-              onTap: () => _makeCall(phone),
-              child: Text(
-                phone,
-                style: const TextStyle(
-                  fontSize: 15, 
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w500,
-                  decoration: TextDecoration.underline,
-                ),
-                textAlign: TextAlign.left,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 40,
-            child: GestureDetector(
-              onTap: () => _makeCall(pPhone), 
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Icon(Icons.family_restroom_rounded, size: 14, color: Colors.grey),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      "$pName($pPhone)",
-                      style: const TextStyle(
-                        fontSize: 14, 
-                        color: Colors.orange,
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
-                      ),
-                      textAlign: TextAlign.left,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          
           GestureDetector(
             onTap: () => _showStudentDetails(s),
             child: Container(
-              padding: const EdgeInsets.only(left: 10),
+              padding: const EdgeInsets.only(left: 14),
               child: const Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.arrow_circle_right_outlined, 
-                    size: 26, 
+                    Icons.arrow_circle_right_rounded, 
+                    size: 32, 
                     color: Colors.indigo,
                   ),
                   Text(
-                    "상세보기",
+                    "상세",
                     style: TextStyle(
-                      fontSize: 9, 
+                      fontSize: 10,
                       color: Colors.indigo,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1187,13 +1243,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       "본인 전화", 
                       phoneController, 
                       keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], // ✅ 숫자와 하이픈만
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], 
                     ),
                     _editField(
                       "생년월일", 
                       birthDateController,
                       keyboardType: TextInputType.datetime,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], // ✅ 숫자와 구분자만
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], 
                     ),
                     _dropdownField(
                       "성별",
@@ -1211,7 +1267,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       "첫 방문일", 
                       firstVisitDateController,
                       keyboardType: TextInputType.datetime,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], // ✅ 숫자와 구분자만
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.-]'))], 
                     ),
                     _editField("인도자", evangelistController),
                     _dropdownField(
@@ -1228,7 +1284,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                       "보호자 전화", 
                       parentPhoneController,
                       keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], // ✅ 숫자와 하이픈만
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]'))], 
                     ),
                     _editField("부모님 출석교회", churchNameController),
                     _dropdownField(
@@ -1298,7 +1354,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // ✅ 유효성 검사 및 키보드 타입을 지원하도록 수정된 헬퍼 함수
   Widget _editField(
     String label,
     TextEditingController controller, {
@@ -1311,8 +1366,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        keyboardType: keyboardType, // ✅ 키보드 타입 설정 (숫자패드 등)
-        inputFormatters: inputFormatters, // ✅ 입력 제한 설정 (문자 입력 방지)
+        keyboardType: keyboardType, 
+        inputFormatters: inputFormatters, 
         style: const TextStyle(fontSize: 15),
         decoration: InputDecoration(
           labelText: label,

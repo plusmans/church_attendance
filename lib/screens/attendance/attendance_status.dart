@@ -360,16 +360,25 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _buildSummaryHeader(),
-          _buildViewToggle(),
-          _buildGroupingToggle(),
-          Expanded(
-            child: _isLoading ? const Center(child: CircularProgressIndicator()) : (_groupingMode == '개인별' ? _buildIndividualList() : (_viewType == '주별' ? _buildWeeklyDetailList() : _buildDashboard())),
-          ),
-        ],
-      ),
+      // ✅ 전체 페이지가 한꺼번에 스크롤되도록 ListView로 통합
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildSummaryHeader(),
+                _buildViewToggle(),
+                _buildGroupingToggle(),
+                // ✅ 선택된 모드에 따라 해당 섹션을 직접 렌더링 (하위 ListView들의 스크롤은 비활성화됨)
+                if (_groupingMode == '개인별') 
+                  _buildIndividualList()
+                else if (_viewType == '주별') 
+                  _buildWeeklyDetailList() 
+                else 
+                  _buildDashboard(),
+                const SizedBox(height: 50), // 하단 여백
+              ],
+            ),
     );
   }
 
@@ -489,17 +498,24 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     ); 
   }
 
+  // ✅ ListView를 Column으로 변경하여 전체 스크롤 내에서 동작하도록 함
   Widget _buildDashboard() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        if (_viewType == '월별' || _viewType == '누적') _buildMonthlyInsights(),
-        _buildDemographicStats(), const SizedBox(height: 20),
-        _buildAbsenceReasonRanking(), const SizedBox(height: 20),
-        _buildTrendChart(), const SizedBox(height: 20),
-        _buildRankingArea(_viewType == '누적' ? '연간 출석률 순위 🏆' : '반별 출석률 🏆', Colors.orange),
-        const SizedBox(height: 20),
-        _buildPastoralSections(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              if (_viewType == '월별' || _viewType == '누적') _buildMonthlyInsights(),
+              _buildDemographicStats(), const SizedBox(height: 20),
+              _buildAbsenceReasonRanking(), const SizedBox(height: 20),
+              _buildTrendChart(), const SizedBox(height: 20),
+              _buildRankingArea(_viewType == '누적' ? '연간 출석률 순위 🏆' : '반별 출석률 🏆', Colors.orange),
+              const SizedBox(height: 20),
+              _buildPastoralSections(),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -582,6 +598,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
+  // ✅ ListView.builder를 Column + List.generate로 변경하거나 shrinkWrap 적용
   Widget _buildIndividualList() {
     final studentList = _individualStats.values.where((m) => m['role'] != '교사').toList();
     if (_individualSortMode == '랭킹순') {
@@ -589,50 +606,71 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     } else {
       studentList.sort((a, b) => (int.tryParse(a['cell'] ?? '99') ?? 99).compareTo(int.tryParse(b['cell'] ?? '99') ?? 99));
     }
-    return ListView.builder(padding: const EdgeInsets.all(10), itemCount: studentList.length, itemBuilder: (c, i) {
-      final m = studentList[i];
-      final double r = (m['t'] ?? 0) > 0 ? (m['p'] / m['t']) : 0;
-      return Card(
-        margin: const EdgeInsets.only(bottom: 6), 
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), 
-        child: ListTile(
-          dense: true, 
-          visualDensity: const VisualDensity(horizontal: 0, vertical: 0), 
-          leading: Row(
-            mainAxisSize: MainAxisSize.min, 
-            children: [
-              SizedBox(width: 30, child: Text('${i + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
-              CircleAvatar(radius: 16, child: Text(m['name'][0], style: const TextStyle(fontSize: 14)))
-            ]
-          ), 
-          title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
-          subtitle: Text("${m['cell']}셀 | ${m['group']}그룹", style: const TextStyle(fontSize: 13)), 
-          trailing: Text("${(r * 100).toInt()}% (${m['p']}/${m['t']}회)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: r >= 0.8 ? Colors.teal : Colors.orange))
-        )
-      );
-    });
-  }
-
-  Widget _buildWeeklyDetailList() {
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      _buildDemographicStats(), const SizedBox(height: 16),
-      _buildAbsenceReasonRanking(), const SizedBox(height: 16),
-      _buildDashboardArea(),
-      ..._cellStats.entries.map((e) {
-        final bool isT = e.key == '교사';
+    return ListView.builder(
+      padding: const EdgeInsets.all(10), 
+      itemCount: studentList.length, 
+      shrinkWrap: true, // ✅ 부모 스크롤을 위해 필수
+      physics: const NeverScrollableScrollPhysics(), // ✅ 내부 스크롤 비활성화
+      itemBuilder: (c, i) {
+        final m = studentList[i];
+        final double r = (m['t'] ?? 0) > 0 ? (m['p'] / m['t']) : 0;
         return Card(
-          margin: const EdgeInsets.only(bottom: 10), 
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), 
-          child: ExpansionTile(
+          margin: const EdgeInsets.only(bottom: 6), 
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), 
+          child: ListTile(
             dense: true, 
-            initiallyExpanded: true, 
-            title: Text(isT ? '👨‍🏫 교사 전체' : '${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), 
-            trailing: Text('${e.value['present']} / ${e.value['total']}명', style: TextStyle(color: isT ? Colors.orange : Colors.teal, fontWeight: FontWeight.bold, fontSize: 14)), 
-            children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: _buildMemberGrid(Map<String, dynamic>.from(e.value['records']), isT))]
+            visualDensity: const VisualDensity(horizontal: 0, vertical: 0), 
+            leading: Row(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                SizedBox(width: 30, child: Text('${i + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
+                CircleAvatar(radius: 16, child: Text(m['name'][0], style: const TextStyle(fontSize: 14)))
+              ]
+            ), 
+            title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
+            subtitle: Text("${m['cell']}셀 | ${m['group']}그룹", style: const TextStyle(fontSize: 13)), 
+            trailing: Text("${(r * 100).toInt()}% (${m['p']}/${m['t']}회)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: r >= 0.8 ? Colors.teal : Colors.orange))
           )
         );
-      }),
-    ]);
+      }
+    );
+  }
+
+  // ✅ ListView를 Column으로 변경
+  Widget _buildWeeklyDetailList() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              _buildDemographicStats(), const SizedBox(height: 16),
+              _buildAbsenceReasonRanking(), const SizedBox(height: 16),
+              _buildDashboardArea(),
+            ],
+          ),
+        ),
+        ..._cellStats.entries.map((e) {
+          final bool isT = e.key == '교사';
+          return Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: ExpansionTile(
+              dense: true, 
+              initiallyExpanded: true, 
+              shape: const RoundedRectangleBorder(side: BorderSide.none),
+              title: Text(isT ? '👨‍🏫 교사 전체' : '${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), 
+              trailing: Text('${e.value['present']} / ${e.value['total']}명', style: TextStyle(color: isT ? Colors.orange : Colors.teal, fontWeight: FontWeight.bold, fontSize: 14)), 
+              children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: _buildMemberGrid(Map<String, dynamic>.from(e.value['records']), isT))]
+            ),
+          );
+        }),
+      ],
+    );
   }
 
   Widget _buildMemberGrid(Map<String, dynamic> r, bool isT) {
@@ -640,7 +678,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     if (isT) {
       return Wrap(spacing: 8, runSpacing: 8, children: entries.map((i) {
         final bool isP = i.value['status'] == '출석';
-        // ✅ 교사 이름 글자 확대 (13 -> 16)
         return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: isP ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList());
     }
@@ -649,13 +686,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (gA.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: gA.map((i) {
         final bool isP = i.value['status'] == '출석';
-        // ✅ 학생 이름 글자 확대 (13 -> 16)
         return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.teal.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.teal.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList()),
       if (gB.isNotEmpty) ...[const SizedBox(height: 16), const Text("특별 관리(B)", style: TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Wrap(spacing: 8, runSpacing: 8, children: gB.map((i) {
         final bool isP = i.value['status'] == '출석';
-        // ✅ B그룹 학생 이름 글자 확대 (13 -> 16)
-        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
+        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: i.value['status'] == '출석' ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList())],
     ]);
   }

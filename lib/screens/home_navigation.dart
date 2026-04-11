@@ -145,16 +145,31 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
     return Scaffold(
       appBar: AppBar(
-        // ✅ 상단 앱바 높이 확대 (기존 42 -> 56)
-        toolbarHeight: 56,
-        title: Text(
-          appBarTitle,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            // ✅ 타이틀 글자 크기 확대 (기존 14 -> 18)
-            fontSize: 18,
-            letterSpacing: -0.8,
-          ),
+        // 모바일 공간 확보를 위해 높이 유지
+        toolbarHeight: 64,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _cheerMessage,
+              style: TextStyle(
+                // ✅ 응원 메시지 크기 확대 (10.5 -> 13.5) 및 시인성 개선
+                fontSize: 13.5,
+                color: Colors.white.withValues(alpha: 0.95),
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.5,
+              ),
+            ),
+            Text(
+              appBarTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 19, 
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
         backgroundColor: themeColor,
         foregroundColor: Colors.white,
@@ -164,31 +179,19 @@ class _HomeNavigationState extends State<HomeNavigation> {
           // 관리자 전용 교사 관리 버튼
           if (widget.role == 'admin')
             IconButton(
-              icon: const Icon(
-                Icons.people_alt_rounded,
-                // ✅ 아이콘 크기 확대 (기존 20 -> 24)
-                size: 24,
-                color: Colors.white70,
-              ),
+              icon: const Icon(Icons.people_alt_rounded, size: 24, color: Colors.white70),
               tooltip: '교사 관리',
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const TeacherManagementScreen(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const TeacherManagementScreen()),
                 );
               },
             ),
 
           // 비밀번호 변경 버튼
           IconButton(
-            icon: const Icon(
-              Icons.lock_reset_rounded,
-              // ✅ 아이콘 크기 확대 (기존 20 -> 24)
-              size: 24,
-              color: Colors.white70,
-            ),
+            icon: const Icon(Icons.lock_reset_rounded, size: 24, color: Colors.white70),
             tooltip: '비밀번호 변경',
             onPressed: () {
               Navigator.push(
@@ -204,71 +207,37 @@ class _HomeNavigationState extends State<HomeNavigation> {
             },
           ),
 
-          // 💡 로그아웃 버튼
+          // 로그아웃 버튼
           IconButton(
-            icon: const Icon(
-              Icons.logout_rounded,
-              // ✅ 아이콘 크기 확대 (기존 19 -> 24)
-              size: 24,
-              color: Colors.white70,
-            ),
+            icon: const Icon(Icons.logout_rounded, size: 24, color: Colors.white70),
             tooltip: '로그아웃',
             onPressed: () => _showLogoutDialog(context),
           ),
 
+          // 우측 끝 사용자 정보
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _cheerMessage,
-                    style: TextStyle(
-                      // ✅ 응원 메시지 크기 확대 (기존 7.5 -> 10)
-                      fontSize: 10,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: -0.5,
-                    ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${widget.teacherName} ${isSuperAdmin ? '사역자' : '교사'}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${widget.teacherName} ${isSuperAdmin ? '사역자님' : '교사'}',
-                        style: const TextStyle(
-                          // ✅ 교사 성함 크기 확대 (기존 10 -> 13)
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          displayRole,
-                          style: const TextStyle(
-                            // ✅ 역할 텍스트 크기 확대 (기존 7 -> 9)
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    displayRole,
+                    style: const TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.w400),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -277,9 +246,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(
-            top: BorderSide(color: Colors.grey.shade200, width: 0.5),
-          ),
+          border: Border(top: BorderSide(color: Colors.grey.shade200, width: 0.5)),
         ),
         child: SafeArea(
           child: SizedBox(
@@ -297,49 +264,27 @@ class _HomeNavigationState extends State<HomeNavigation> {
               },
               selectedItemColor: themeColor,
               unselectedItemColor: Colors.grey.shade400,
-              selectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 11,
-              ),
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
               iconSize: 22,
               items: [
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 0
-                        ? Icons.bar_chart_rounded
-                        : Icons.bar_chart_outlined,
-                  ),
+                  icon: Icon(_selectedIndex == 0 ? Icons.bar_chart_rounded : Icons.bar_chart_outlined),
                   label: '현황',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 1
-                        ? Icons.edit_calendar_rounded
-                        : Icons.edit_calendar_outlined,
-                  ),
+                  icon: Icon(_selectedIndex == 1 ? Icons.edit_calendar_rounded : Icons.edit_calendar_outlined),
                   label: '출석',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 2
-                        ? Icons.manage_accounts_rounded
-                        : Icons.manage_accounts_outlined,
-                  ),
+                  icon: Icon(_selectedIndex == 2 ? Icons.manage_accounts_rounded : Icons.manage_accounts_outlined),
                   label: '관리',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(
-                    _selectedIndex == 3
-                        ? Icons.volunteer_activism
-                        : Icons.volunteer_activism_outlined,
-                  ),
+                  icon: Icon(_selectedIndex == 3 ? Icons.volunteer_activism : Icons.volunteer_activism_outlined),
                   label: '기도',
                 ),
               ],
