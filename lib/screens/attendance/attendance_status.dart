@@ -377,27 +377,128 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final double sRate = _studentTotal > 0 ? (_studentPresent / _studentTotal) * 100 : 0;
     final double tRate = _teacherTotal > 0 ? (_teacherPresent / _teacherTotal) * 100 : 0;
     final String titleText = _viewType == '주별' ? DateFormat('yyyy. MM. dd').format(_selectedDate) : _viewType == '월별' ? DateFormat('yyyy년 MM월').format(_selectedDate) : "${_selectedDate.year}년 연간 누적";
-    return Container(padding: const EdgeInsets.fromLTRB(16, 8, 16, 8), child: Column(children: [InkWell(onTap: _viewType == '누적' ? null : _selectDate, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [Text(titleText, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.teal)), if (_viewType != '누적') const Icon(Icons.arrow_drop_down, color: Colors.teal, size: 20)])), const SizedBox(height: 8), Row(children: [_buildSummaryCard("학생 (재적)", _studentPresent, _studentTotal, sRate, Colors.blue), const SizedBox(width: 8), _buildSummaryCard("교사", _teacherPresent, _teacherTotal, tRate, Colors.orange)])]));
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12), 
+      child: Column(
+        children: [
+          InkWell(
+            onTap: _viewType == '누적' ? null : _selectDate, 
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center, 
+              children: [
+                Text(titleText, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)), 
+                if (_viewType != '누적') const Icon(Icons.arrow_drop_down, color: Colors.teal, size: 24)
+              ]
+            )
+          ), 
+          const SizedBox(height: 12), 
+          Row(
+            children: [
+              _buildSummaryCard("학생 (재적)", _studentPresent, _studentTotal, sRate, Colors.blue), 
+              const SizedBox(width: 8), 
+              _buildSummaryCard("교사", _teacherPresent, _teacherTotal, tRate, Colors.orange)
+            ]
+          )
+        ]
+      )
+    );
   }
 
   Widget _buildSummaryCard(String t, int p, int tot, double r, Color c) { 
-    return Expanded(child: Container(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10), decoration: BoxDecoration(color: c.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withValues(alpha: 0.1))), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 10)), Text("$p / $tot명", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold))]), Text("${r.toStringAsFixed(1)}%", style: TextStyle(color: c, fontSize: 13, fontWeight: FontWeight.bold))]))); 
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12), 
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: c.withValues(alpha: 0.1))), 
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 12)), 
+                Text("$p / $tot명", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))
+              ]
+            ), 
+            Text("${r.toStringAsFixed(1)}%", style: TextStyle(color: c, fontSize: 15, fontWeight: FontWeight.bold))
+          ]
+        )
+      )
+    ); 
   }
 
-  Widget _buildViewToggle() { return Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), child: Container(height: 32, decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)), child: Row(children: ['주별', '월별', '누적'].map((type) { bool isS = _viewType == type; return Expanded(child: GestureDetector(onTap: () { setState(() { _viewType = type; _fetchStats(); }); }, child: Container(alignment: Alignment.center, decoration: BoxDecoration(color: isS ? Colors.teal : Colors.transparent, borderRadius: BorderRadius.circular(8)), child: Text(type, style: TextStyle(color: isS ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12))))); }).toList()))); }
-  Widget _buildGroupingToggle() { return Padding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 4), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Row(children: [_toggleButton('셀별', _groupingMode == '셀별', () => setState(() => _groupingMode = '셀별')), const SizedBox(width: 6), _toggleButton('개인별', _groupingMode == '개인별', () => setState(() => _groupingMode = '개인별'))]), if (_groupingMode == '개인별') InkWell(onTap: () => setState(() => _individualSortMode = _individualSortMode == '셀순' ? '랭킹순' : '셀순'), child: Row(children: [Text(_individualSortMode, style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)), const Icon(Icons.sort, size: 14)]))])); }
-  Widget _toggleButton(String l, bool s, VoidCallback t) { return GestureDetector(onTap: t, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5), decoration: BoxDecoration(color: s ? Colors.blueGrey : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: s ? Colors.blueGrey : Colors.grey.shade300)), child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: s ? Colors.white : Colors.grey.shade600)))); }
+  Widget _buildViewToggle() { 
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), 
+      child: Container(
+        height: 40, 
+        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)), 
+        child: Row(
+          children: ['주별', '월별', '누적'].map((type) { 
+            bool isS = _viewType == type; 
+            return Expanded(
+              child: GestureDetector(
+                onTap: () { setState(() { _viewType = type; _fetchStats(); }); }, 
+                child: Container(
+                  alignment: Alignment.center, 
+                  decoration: BoxDecoration(color: isS ? Colors.teal : Colors.transparent, borderRadius: BorderRadius.circular(10)), 
+                  child: Text(type, style: TextStyle(color: isS ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 14))
+                )
+              )
+            ); 
+          }).toList()
+        )
+      )
+    ); 
+  }
+
+  Widget _buildGroupingToggle() { 
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6), 
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+        children: [
+          Row(
+            children: [
+              _toggleButton('셀별', _groupingMode == '셀별', () => setState(() => _groupingMode = '셀별')), 
+              const SizedBox(width: 8), 
+              _toggleButton('개인별', _groupingMode == '개인별', () => setState(() => _groupingMode = '개인별'))
+            ]
+          ), 
+          if (_groupingMode == '개인별') InkWell(
+            onTap: () => setState(() => _individualSortMode = _individualSortMode == '셀순' ? '랭킹순' : '셀순'), 
+            child: Row(
+              children: [
+                Text(_individualSortMode, style: const TextStyle(fontSize: 13, color: Colors.blueGrey, fontWeight: FontWeight.bold)), 
+                const Icon(Icons.sort, size: 16)
+              ]
+            )
+          )
+        ]
+      )
+    ); 
+  }
+
+  Widget _toggleButton(String l, bool s, VoidCallback t) { 
+    return GestureDetector(
+      onTap: t, 
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7), 
+        decoration: BoxDecoration(color: s ? Colors.blueGrey : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: s ? Colors.blueGrey : Colors.grey.shade300)), 
+        child: Text(l, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: s ? Colors.white : Colors.grey.shade600))
+      )
+    ); 
+  }
 
   Widget _buildDashboard() {
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       children: [
         if (_viewType == '월별' || _viewType == '누적') _buildMonthlyInsights(),
-        _buildDemographicStats(), const SizedBox(height: 16),
-        _buildAbsenceReasonRanking(), const SizedBox(height: 16),
-        _buildTrendChart(), const SizedBox(height: 16),
+        _buildDemographicStats(), const SizedBox(height: 20),
+        _buildAbsenceReasonRanking(), const SizedBox(height: 20),
+        _buildTrendChart(), const SizedBox(height: 20),
         _buildRankingArea(_viewType == '누적' ? '연간 출석률 순위 🏆' : '반별 출석률 🏆', Colors.orange),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         _buildPastoralSections(),
       ],
     );
@@ -405,18 +506,18 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildDemographicStats() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text("학년 및 성별 출석 현황 📊", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-      Row(children: [_buildDemographicCard("학년별", _gradeStats, Colors.blue), const SizedBox(width: 8), _buildDemographicCard("성별", _genderStats, Colors.pink)]),
+      const Padding(padding: EdgeInsets.only(left: 4, bottom: 10), child: Text("학년 및 성별 출석 현황 📊", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17))),
+      Row(children: [_buildDemographicCard("학년별", _gradeStats, Colors.blue), const SizedBox(width: 10), _buildDemographicCard("성별", _genderStats, Colors.pink)]),
     ]);
   }
 
   Widget _buildDemographicCard(String title, Map<String, Map<String, int>> stats, Color color) {
-    return Expanded(child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: color.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.1))),
+    return Expanded(child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.1))),
       child: Column(children: stats.entries.map((e) {
         final double r = e.value['t']! > 0 ? e.value['p']! / e.value['t']! : 0;
-        return Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Column(children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(e.key, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)), Text("${(r * 100).toInt()}% (${e.value['p']}/${e.value['t']})", style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold))]),
-          const SizedBox(height: 3), ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: r, backgroundColor: color.withValues(alpha: 0.1), color: color.withValues(alpha: 0.4), minHeight: 3)),
+        return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Column(children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(e.key, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), Text("${(r * 100).toInt()}% (${e.value['p']}/${e.value['t']})", style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold))]),
+          const SizedBox(height: 4), ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(value: r, backgroundColor: color.withValues(alpha: 0.1), color: color.withValues(alpha: 0.4), minHeight: 4)),
         ]));
       }).toList()),
     ));
@@ -427,15 +528,15 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final top5 = sortedReasons.take(5).toList();
     final int tot = _absenceReasonCounts.values.fold(0, (s, c) => s + c);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text("결석 사유 분석 Top 5 🔍", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-      Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.withValues(alpha: 0.05))),
-        child: tot == 0 ? const Center(child: Text("데이터 없음", style: TextStyle(fontSize: 11, color: Colors.grey))) : Column(children: top5.asMap().entries.map((e) {
+      const Padding(padding: EdgeInsets.only(left: 4, bottom: 10), child: Text("결석 사유 분석 Top 5 🔍", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17))),
+      Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.withValues(alpha: 0.05))),
+        child: tot == 0 ? const Center(child: Text("데이터 없음", style: TextStyle(fontSize: 13, color: Colors.grey))) : Column(children: top5.asMap().entries.map((e) {
           final double p = e.value.value / tot;
-          return Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
-            SizedBox(width: 15, child: Text("${e.key + 1}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.redAccent))),
+          return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [
+            SizedBox(width: 20, child: Text("${e.key + 1}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.redAccent))),
             Expanded(child: Column(children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(e.value.key, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)), Text("${e.value.value}명", style: const TextStyle(fontSize: 10, color: Colors.blueGrey))]),
-              const SizedBox(height: 2), ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: p, color: Colors.redAccent.withValues(alpha: 0.4), backgroundColor: Colors.redAccent.withValues(alpha: 0.05), minHeight: 3)),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(e.value.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), Text("${e.value.value}명", style: const TextStyle(fontSize: 12, color: Colors.blueGrey))]),
+              const SizedBox(height: 3), ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(value: p, color: Colors.redAccent.withValues(alpha: 0.4), backgroundColor: Colors.redAccent.withValues(alpha: 0.05), minHeight: 4)),
             ])),
           ]));
         }).toList()),
@@ -445,16 +546,16 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildTrendChart() {
     final sortedTrend = List.from(_summaryList).reversed.toList();
-    return Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withValues(alpha: 0.05))),
+    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withValues(alpha: 0.05))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('출석률 추이', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue)),
-        const SizedBox(height: 12),
-        SizedBox(height: 80, child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, crossAxisAlignment: CrossAxisAlignment.end, children: sortedTrend.map((i) {
+        const Text('출석률 추이', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.blue)),
+        const SizedBox(height: 16),
+        SizedBox(height: 100, child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, crossAxisAlignment: CrossAxisAlignment.end, children: sortedTrend.map((i) {
           final double r = (i['sT'] ?? 0) > 0 ? (i['sP'] / i['sT']) : 0;
           return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Text('${(r * 100).toInt()}%', style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.blue)),
-            Container(width: 16, height: (r * 50) + 2, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(3))),
-            Text((i['date'] as String).substring(5), style: const TextStyle(fontSize: 7, color: Colors.grey)),
+            Text('${(r * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+            Container(width: 18, height: (r * 60) + 4, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4))),
+            Text((i['date'] as String).substring(5), style: const TextStyle(fontSize: 9, color: Colors.grey)),
           ]);
         }).toList())),
       ]),
@@ -463,18 +564,18 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildRankingArea(String title, Color mainColor) {
     final sortedCells = _cellAverages.entries.where((e) => e.key != '교사').toList()..sort((a, b) => b.value.compareTo(a.value));
-    return Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: mainColor.withValues(alpha: 0.1))),
+    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: mainColor.withValues(alpha: 0.1))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 14)),
-        const SizedBox(height: 10),
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 17)),
+        const SizedBox(height: 12),
         ...sortedCells.asMap().entries.map((entry) {
           final int rnk = entry.key + 1;
           final v = entry.value;
-          return Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
-            CircleAvatar(radius: 9, backgroundColor: rnk == 1 ? Colors.amber : Colors.grey.shade100, child: Text('$rnk', style: TextStyle(fontSize: 9, color: rnk == 1 ? Colors.white : Colors.grey))),
-            const SizedBox(width: 8), Text('${v.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            const Spacer(), Text('${(v.value * 100).toStringAsFixed(1)}%', style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 12)),
-            const SizedBox(width: 8), SizedBox(width: 50, child: LinearProgressIndicator(value: v.value, color: mainColor.withValues(alpha: 0.6), backgroundColor: mainColor.withValues(alpha: 0.05), minHeight: 3)),
+          return Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: [
+            CircleAvatar(radius: 11, backgroundColor: rnk == 1 ? Colors.amber : Colors.grey.shade100, child: Text('$rnk', style: TextStyle(fontSize: 11, color: rnk == 1 ? Colors.white : Colors.grey))),
+            const SizedBox(width: 10), Text('${v.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Spacer(), Text('${(v.value * 100).toStringAsFixed(1)}%', style: TextStyle(fontWeight: FontWeight.bold, color: mainColor, fontSize: 14)),
+            const SizedBox(width: 10), SizedBox(width: 60, child: LinearProgressIndicator(value: v.value, color: mainColor.withValues(alpha: 0.6), backgroundColor: mainColor.withValues(alpha: 0.05), minHeight: 4)),
           ]));
         }),
       ]),
@@ -488,21 +589,48 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     } else {
       studentList.sort((a, b) => (int.tryParse(a['cell'] ?? '99') ?? 99).compareTo(int.tryParse(b['cell'] ?? '99') ?? 99));
     }
-    return ListView.builder(padding: const EdgeInsets.all(8), itemCount: studentList.length, itemBuilder: (c, i) {
+    return ListView.builder(padding: const EdgeInsets.all(10), itemCount: studentList.length, itemBuilder: (c, i) {
       final m = studentList[i];
       final double r = (m['t'] ?? 0) > 0 ? (m['p'] / m['t']) : 0;
-      return Card(margin: const EdgeInsets.only(bottom: 4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), child: ListTile(dense: true, visualDensity: const VisualDensity(horizontal: 0, vertical: -4), leading: Row(mainAxisSize: MainAxisSize.min, children: [SizedBox(width: 25, child: Text('${i + 1}', style: TextStyle(fontSize: 10, color: Colors.grey.shade400))), CircleAvatar(radius: 14, child: Text(m['name'][0], style: const TextStyle(fontSize: 12)))]), title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), subtitle: Text("${m['cell']}셀 | ${m['group']}그룹"), trailing: Text("${(r * 100).toInt()}% (${m['p']}/${m['t']}회)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: r >= 0.8 ? Colors.teal : Colors.orange))));
+      return Card(
+        margin: const EdgeInsets.only(bottom: 6), 
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), 
+        child: ListTile(
+          dense: true, 
+          visualDensity: const VisualDensity(horizontal: 0, vertical: 0), 
+          leading: Row(
+            mainAxisSize: MainAxisSize.min, 
+            children: [
+              SizedBox(width: 30, child: Text('${i + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
+              CircleAvatar(radius: 16, child: Text(m['name'][0], style: const TextStyle(fontSize: 14)))
+            ]
+          ), 
+          title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
+          subtitle: Text("${m['cell']}셀 | ${m['group']}그룹", style: const TextStyle(fontSize: 13)), 
+          trailing: Text("${(r * 100).toInt()}% (${m['p']}/${m['t']}회)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: r >= 0.8 ? Colors.teal : Colors.orange))
+        )
+      );
     });
   }
 
   Widget _buildWeeklyDetailList() {
-    return ListView(padding: const EdgeInsets.all(12), children: [
-      _buildDemographicStats(), const SizedBox(height: 12),
-      _buildAbsenceReasonRanking(), const SizedBox(height: 12),
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      _buildDemographicStats(), const SizedBox(height: 16),
+      _buildAbsenceReasonRanking(), const SizedBox(height: 16),
       _buildDashboardArea(),
       ..._cellStats.entries.map((e) {
         final bool isT = e.key == '교사';
-        return Card(margin: const EdgeInsets.only(bottom: 8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), child: ExpansionTile(dense: true, initiallyExpanded: true, title: Text(isT ? '👨‍🏫 교사 전체' : '${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), trailing: Text('${e.value['present']} / ${e.value['total']}명', style: TextStyle(color: isT ? Colors.orange : Colors.teal, fontWeight: FontWeight.bold, fontSize: 12)), children: [Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: _buildMemberGrid(Map<String, dynamic>.from(e.value['records']), isT))]));
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10), 
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), 
+          child: ExpansionTile(
+            dense: true, 
+            initiallyExpanded: true, 
+            title: Text(isT ? '👨‍🏫 교사 전체' : '${e.key}셀', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)), 
+            trailing: Text('${e.value['present']} / ${e.value['total']}명', style: TextStyle(color: isT ? Colors.orange : Colors.teal, fontWeight: FontWeight.bold, fontSize: 14)), 
+            children: [Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: _buildMemberGrid(Map<String, dynamic>.from(e.value['records']), isT))]
+          )
+        );
       }),
     ]);
   }
@@ -510,21 +638,24 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget _buildMemberGrid(Map<String, dynamic> r, bool isT) {
     final entries = r.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     if (isT) {
-      return Wrap(spacing: 4, runSpacing: 4, children: entries.map((i) {
+      return Wrap(spacing: 8, runSpacing: 8, children: entries.map((i) {
         final bool isP = i.value['status'] == '출석';
-        return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(4)), child: Text(i.key, style: TextStyle(fontSize: 11, color: isP ? Colors.orange.shade800 : Colors.grey.shade400)));
+        // ✅ 교사 이름 글자 확대 (13 -> 16)
+        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: isP ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList());
     }
     final gA = entries.where((i) => (i.value['group'] ?? 'A') == 'A').toList();
     final gB = entries.where((i) => (i.value['group'] ?? 'A') == 'B').toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (gA.isNotEmpty) Wrap(spacing: 4, runSpacing: 4, children: gA.map((i) {
+      if (gA.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: gA.map((i) {
         final bool isP = i.value['status'] == '출석';
-        return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: isP ? Colors.teal.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(4)), child: Text(i.key, style: TextStyle(fontSize: 11, color: i.value['status'] == '출석' ? Colors.teal.shade800 : Colors.grey.shade400)));
+        // ✅ 학생 이름 글자 확대 (13 -> 16)
+        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.teal.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.teal.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList()),
-      if (gB.isNotEmpty) ...[const SizedBox(height: 8), const Text("특별 관리(B)", style: TextStyle(fontSize: 9, color: Colors.orange, fontWeight: FontWeight.bold)), const SizedBox(height: 4), Wrap(spacing: 4, runSpacing: 4, children: gB.map((i) {
+      if (gB.isNotEmpty) ...[const SizedBox(height: 16), const Text("특별 관리(B)", style: TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.bold)), const SizedBox(height: 8), Wrap(spacing: 8, runSpacing: 8, children: gB.map((i) {
         final bool isP = i.value['status'] == '출석';
-        return Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(4)), child: Text(i.key, style: TextStyle(fontSize: 11, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400)));
+        // ✅ B그룹 학생 이름 글자 확대 (13 -> 16)
+        return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(i.key, style: TextStyle(fontSize: 16, color: i.value['status'] == '출석' ? Colors.orange.shade800 : Colors.grey.shade400, fontWeight: isP ? FontWeight.bold : FontWeight.normal)));
       }).toList())],
     ]);
   }
@@ -535,22 +666,27 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final first = _individualStats.values.where((m) => m['role'] != '교사' && (m['firstVisitDate']?.toString().startsWith(dateFilter) ?? false)).toList();
     final promoted = _individualStats.values.where((m) => m['role'] != '교사' && (m['promotedAt']?.toString().startsWith(dateFilter) ?? false)).toList();
     final absent = _individualStats.values.where((m) => m['role'] != '교사' && (m['p'] ?? 0) == 0 && (m['t'] ?? 0) > 0).toList();
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildNameListSection("개근자 🏆", perfect, Colors.teal), const SizedBox(height: 16), _buildNameListSection("새친구 방문 🎁", first, Colors.orange), const SizedBox(height: 16), _buildNameListSection("등반 소식 🎉", promoted, Colors.indigo), const SizedBox(height: 16), _buildNameListSection("심방 권면 대상 📞", absent, Colors.red)]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildNameListSection("개근자 🏆", perfect, Colors.teal), const SizedBox(height: 20), _buildNameListSection("새친구 방문 🎁", first, Colors.orange), const SizedBox(height: 20), _buildNameListSection("등반 소식 🎉", promoted, Colors.indigo), const SizedBox(height: 20), _buildNameListSection("심방 권면 대상 📞", absent, Colors.red)]);
   }
 
-  Widget _buildNameListSection(String t, List<Map<String, dynamic>> l, Color c) { return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Padding(padding: const EdgeInsets.only(left: 4, bottom: 6), child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))), Container(width: double.infinity, padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: c.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withValues(alpha: 0.08))), child: l.isEmpty ? const Text("대상자 없음", style: TextStyle(color: Colors.grey, fontSize: 11)) : Wrap(spacing: 6, runSpacing: 6, children: l.map((m) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: c.withValues(alpha: 0.1))), child: Text("${m['name']} (${m['cell'] ?? '0'}셀)", style: TextStyle(fontSize: 11, color: c.withValues(alpha: 0.8), fontWeight: FontWeight.bold)))).toList()))]); }
+  Widget _buildNameListSection(String t, List<Map<String, dynamic>> l, Color c) { 
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.only(left: 4, bottom: 8), child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))), 
+      Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: c.withValues(alpha: 0.08))), child: l.isEmpty ? const Text("대상자 없음", style: TextStyle(color: Colors.grey, fontSize: 13)) : Wrap(spacing: 8, runSpacing: 8, children: l.map((m) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: c.withValues(alpha: 0.1))), child: Text("${m['name']} (${m['cell'] ?? '0'}셀)", style: TextStyle(fontSize: 13, color: c.withValues(alpha: 0.8), fontWeight: FontWeight.bold)))).toList()))
+    ]); 
+  }
 
   Widget _buildDashboardArea() {
     final sortedDashboard = _cellStats.entries.where((e) => e.key != '교사').toList()..sort((a, b) => (b.value['present'] / (b.value['total'] > 0 ? b.value['total'] : 1)).compareTo(a.value['present'] / (a.value['total'] > 0 ? a.value['total'] : 1)));
-    return Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
+    return Container(margin: const EdgeInsets.only(bottom: 16), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Padding(padding: EdgeInsets.only(bottom: 8), child: Row(children: [Icon(Icons.auto_graph, size: 14, color: Colors.teal), SizedBox(width: 6), Text("📊 셀별 출석 현황 (랭킹순)", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal))])),
+        const Padding(padding: EdgeInsets.only(bottom: 10), child: Row(children: [Icon(Icons.auto_graph, size: 16, color: Colors.teal), SizedBox(width: 8), Text("📊 셀별 출석 현황 (랭킹순)", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.teal))])),
         ...sortedDashboard.map((e) {
           final double rate = e.value['total'] > 0 ? e.value['present'] / e.value['total'] : 0;
-          return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Row(children: [
-            SizedBox(width: 35, child: Text('${e.key}셀', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))),
-            Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: rate, color: Colors.teal.withValues(alpha: 0.6), backgroundColor: Colors.white, minHeight: 5))),
-            const SizedBox(width: 8), Text('${(rate * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal)),
+          return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+            SizedBox(width: 45, child: Text('${e.key}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+            Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(value: rate, color: Colors.teal.withValues(alpha: 0.6), backgroundColor: Colors.white, minHeight: 7))),
+            const SizedBox(width: 10), Text('${(rate * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.teal)),
           ]));
         }),
       ]),
@@ -572,17 +708,33 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       final int totalNew = _individualStats.values.where((m) => m['role'] != '학생' && m['role'] != '교사' && (m['firstVisitDate']?.toString().startsWith(year) ?? false)).length;
       final int promoted = _individualStats.values.where((m) => m['role'] != '교사' && (m['promotedAt']?.toString().startsWith(year) ?? false)).length;
       final double rate = totalNew > 0 ? (promoted / totalNew) * 100 : 0;
-      return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [_insightCard("개근자", "$perfectCount명", Colors.teal), const SizedBox(width: 8), _insightCard("정착률", "${rate.toStringAsFixed(1)}%", Colors.indigo)]));
+      return Padding(padding: const EdgeInsets.only(bottom: 16), child: Row(children: [_insightCard("개근자", "$perfectCount명", Colors.teal), const SizedBox(width: 10), _insightCard("정착률", "${rate.toStringAsFixed(1)}%", Colors.indigo)]));
     }
-    return Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(children: [_insightCard("이달의 개근", "$perfectCount명", Colors.teal), const SizedBox(width: 8), _insightCard("최고 출석 셀", bestCell, Colors.orange)]));
+    return Padding(padding: const EdgeInsets.only(bottom: 16), child: Row(children: [_insightCard("이달의 개근", "$perfectCount명", Colors.teal), const SizedBox(width: 10), _insightCard("최고 출석 셀", bestCell, Colors.orange)]));
   }
-  Widget _insightCard(String l, String v, Color c) { return Expanded(child: Container(padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12), decoration: BoxDecoration(color: c.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10), border: Border.all(color: c.withValues(alpha: 0.2))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: c)), Text(v, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c))]))); }
+
+  Widget _insightCard(String l, String v, Color c) { 
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14), 
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: c.withValues(alpha: 0.2))), 
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, 
+          children: [
+            Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: c)), 
+            const SizedBox(height: 4),
+            Text(v, style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: c))
+          ]
+        )
+      )
+    ); 
+  }
 
   Future<void> _selectDate() async {
     if (_viewType == '월별') {
       int ty = _selectedDate.year;
       int tm = _selectedDate.month;
-      final pd = await showDialog<DateTime>(context: context, builder: (c) => AlertDialog(title: const Text('조회 월 선택', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButton<int>(value: ty, isExpanded: true, items: List.generate(5, (i) => 2024 + i).map((y) => DropdownMenuItem(value: y, child: Text('$y년'))).toList(), onChanged: (y) => ty = y!), const SizedBox(height: 8), Wrap(spacing: 8, runSpacing: 8, children: List.generate(12, (i) => i + 1).map((m) { bool isCurrent = tm == m; return InkWell(onTap: () => Navigator.pop(context, DateTime(ty, m, 1)), child: Container(width: 45, height: 35, alignment: Alignment.center, decoration: BoxDecoration(color: isCurrent ? Colors.teal : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text('$m월', style: TextStyle(color: isCurrent ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 12)))); }).toList())])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소'))]));
+      final pd = await showDialog<DateTime>(context: context, builder: (c) => AlertDialog(title: const Text('조회 월 선택', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), content: SizedBox(width: double.maxFinite, child: Column(mainAxisSize: MainAxisSize.min, children: [DropdownButton<int>(value: ty, isExpanded: true, items: List.generate(5, (i) => 2024 + i).map((y) => DropdownMenuItem(value: y, child: Text('$y년'))).toList(), onChanged: (y) => ty = y!), const SizedBox(height: 12), Wrap(spacing: 10, runSpacing: 10, children: List.generate(12, (i) => i + 1).map((m) { bool isCurrent = tm == m; return InkWell(onTap: () => Navigator.pop(context, DateTime(ty, m, 1)), child: Container(width: 50, height: 40, alignment: Alignment.center, decoration: BoxDecoration(color: isCurrent ? Colors.teal : Colors.grey.shade100, borderRadius: BorderRadius.circular(8)), child: Text('$m월', style: TextStyle(color: isCurrent ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)))); }).toList())])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인'))]));
       if (pd != null) {
         setState(() {
           _selectedDate = pd;

@@ -90,7 +90,6 @@ class _PrayerScreenState extends State<PrayerScreen> {
 
       if (mounted) {
         if (doc.exists) {
-          // ✅ .get('field')를 사용하여 cast 경고와 Object? 에러를 동시에 피함
           final List<dynamic> contentList = doc.get('content') ?? [];
           setState(() {
             _controllers = contentList.isNotEmpty
@@ -463,39 +462,41 @@ class _PrayerScreenState extends State<PrayerScreen> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // ✅ 월 선택 드롭다운 (상단 왼쪽)
                       _buildMonthSelector(),
+                      // ✅ PDF 출력 버튼 (상단 오른쪽) 확대
                       TextButton.icon(
                         onPressed: _generateAndPrintPdf,
                         icon: const Icon(
                           Icons.picture_as_pdf,
                           color: Colors.redAccent,
-                          size: 14,
+                          size: 18, // ✅ 14 -> 18로 확대
                         ),
                         label: const Text(
                           'PDF 출력',
                           style: TextStyle(
                             color: Colors.redAccent,
-                            fontSize: 11,
+                            fontSize: 14, // ✅ 11 -> 14로 확대
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red.shade50,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: 12, // ✅ 8 -> 12로 확대
+                            vertical: 8, // ✅ 4 -> 8로 확대
                           ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
                               color: Colors.red.shade100,
                               width: 0.5,
@@ -505,7 +506,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   _buildCommonArea(),
                   const SizedBox(height: 12),
                   _buildUrgentInputArea(),
@@ -558,7 +559,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 '🚨 긴급 기도 요청',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 15, // ✅ 제목 크기 확대 (13 -> 15)
+                  fontSize: 15,
                   color: Colors.red.shade900,
                 ),
               ),
@@ -568,12 +569,12 @@ class _PrayerScreenState extends State<PrayerScreen> {
           TextField(
             controller: _urgentController,
             maxLines: null,
-            style: const TextStyle(fontSize: 14), // ✅ 본문 크기 확대 (12 -> 14)
+            style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(
               hintText: '긴급히 함께 기도할 제목을 입력하세요',
               hintStyle: TextStyle(
                 color: Colors.red.shade200,
-                fontSize: 13, // ✅ 힌트 크기 확대 (11 -> 13)
+                fontSize: 13,
               ),
               isDense: true,
               border: InputBorder.none,
@@ -650,7 +651,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 const Text(
                   '🚩 최근 긴급 요청',
                   style: TextStyle(
-                    fontSize: 14, // ✅ 헤더 크기 확대 (12 -> 14)
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.red,
                   ),
@@ -668,7 +669,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                           child: Text(
                             '• ${d.get('content')} (${d.get('authorName')})',
                             style: const TextStyle(
-                              fontSize: 14, // ✅ 본문 크기 확대 (11 -> 14)
+                              fontSize: 14,
                               color: Colors.black87,
                             ),
                           ),
@@ -694,27 +695,29 @@ class _PrayerScreenState extends State<PrayerScreen> {
     );
   }
 
+  // ✅ 월 선택 드롭다운 UI 확대
   Widget _buildMonthSelector() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.calendar_month, color: Colors.teal, size: 16),
-        const SizedBox(width: 4),
+        const Icon(Icons.calendar_month, color: Colors.teal, size: 18), // ✅ 16 -> 18로 확대
+        const SizedBox(width: 6),
         Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          height: 38, // ✅ 28 -> 38로 대폭 확대
+          padding: const EdgeInsets.symmetric(horizontal: 10), // ✅ 6 -> 10으로 확대
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.teal.shade100, width: 0.5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.teal.shade200, width: 1.0), // ✅ 선 두께 및 색상 강조
+            color: Colors.white,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _currentMonth,
-              icon: const Icon(Icons.arrow_drop_down, size: 18),
+              icon: const Icon(Icons.arrow_drop_down, size: 24, color: Colors.teal), // ✅ 18 -> 24로 확대
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 16, // ✅ 12 -> 16으로 대폭 확대
                 color: Colors.black87,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.bold,
               ),
               items: _monthOptions
                   .map(
@@ -769,7 +772,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: Colors.teal.shade900,
-                      fontSize: 15, // ✅ 제목 크기 확대 (13 -> 15)
+                      fontSize: 15,
                     ),
                   ),
                 ],
@@ -831,7 +834,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                     child: Text(
                       '${entry.key + 1}. ${_cleanText(entry.value.text)}',
                       style: TextStyle(
-                        fontSize: 15, // ✅ 본문 크기 확대 (12 -> 15)
+                        fontSize: 15,
                         color: Colors.teal.shade800,
                         height: 1.4,
                       ),
@@ -1023,7 +1026,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
             final doc = docs[index];
             final List<dynamic> contents = doc.get('content') ?? [];
             return Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), // ✅ 선생님별 카드 간격 확대
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -1046,7 +1049,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                         '${index + 1}. ${_cleanName(doc.get('teacherName') ?? '교사')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18, // ✅ 17 -> 18로 확대
+                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1063,13 +1066,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   const SizedBox(height: 6),
                   ...contents.asMap().entries.map(
                         (e) => Padding(
-                          padding: const EdgeInsets.only(top: 8), // ✅ 기도제목 항목 간 간격 충분히 확보
+                          padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             '${e.key + 1}. ${_cleanText(e.value.toString())}',
                             style: const TextStyle(
-                              fontSize: 16, // ✅ 15 -> 16으로 확대
+                              fontSize: 16,
                               color: Colors.black87,
-                              height: 1.5, // ✅ 줄 간격 확대
+                              height: 1.5,
                             ),
                           ),
                         ),

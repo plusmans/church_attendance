@@ -82,7 +82,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
       String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : (int.tryParse(_currentCell) ?? _currentCell).toString();
-      // ✅ Lint: unnecessary_brace_in_string_interps 해결 ($cleanCellNum셀)
       String docId = _currentCell == 'teachers' ? "teachers_$dateStr" : "$cleanCellNum셀_$dateStr";
 
       var doc = await FirebaseFirestore.instance.collection('attendance').doc(docId).get();
@@ -174,7 +173,6 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
       String cleanCellNum = _currentCell == 'teachers' ? 'teachers' : _currentCell;
-      // ✅ Lint: unnecessary_brace_in_string_interps 해결 ($cleanCellNum셀)
       String docId = _currentCell == 'teachers' ? "teachers_$dateStr" : "$cleanCellNum셀_$dateStr";
 
       WriteBatch batch = FirebaseFirestore.instance.batch();
@@ -277,15 +275,22 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
                 var data = _attendanceData[name]!; 
                 bool isP = data['status'] == '출석';
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
+                  margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: isP ? Colors.white : Colors.red.withValues(alpha: 0.02),
-                    borderRadius: BorderRadius.circular(10), 
+                    borderRadius: BorderRadius.circular(12), 
                     border: Border.all(color: isP ? Colors.grey.shade100 : Colors.red.shade50),
                   ),
-                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), child: Column(children: [
-                    Row(children: [SizedBox(width: 18, child: Text('${index + 1}', style: TextStyle(fontSize: 11, color: Colors.grey.shade400))), Expanded(child: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))), _miniStatusToggle(name, isP, mainColor)]),
-                    if (!isP) ...[const SizedBox(height: 6), isTMode ? _buildCustomReasonField(name) : _buildReasonDropdown(name, data)],
+                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), child: Column(children: [
+                    Row(children: [
+                      SizedBox(width: 24, child: Text('${index + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
+                      Expanded(child: Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))), 
+                      _miniStatusToggle(name, isP, mainColor)
+                    ]),
+                    if (!isP) ...[
+                      const SizedBox(height: 10), 
+                      isTMode ? _buildCustomReasonField(name) : _buildReasonDropdown(name, data)
+                    ],
                   ])),
                 );
               },
@@ -302,15 +307,43 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     final bool isGrade = role.contains('학년담당');
     List<String> allowed = isFull ? List.generate(10, (i) => '${i + 1}') : (isGrade ? (gradeCellMap[role] ?? gradeCellMap[widget.teacherGrade.trim()] ?? []) : [_currentCell]);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Colors.grey.shade100))),
+      // ✅ 상단 선택 바 패딩 확대
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Colors.grey.shade100, width: 1.5))),
       child: Row(children: [
-        Expanded(child: InkWell(onTap: () => _selectDate(), child: Row(children: [Icon(Icons.calendar_today, size: 12, color: mainColor), const SizedBox(width: 6), Text(DateFormat('yyyy. MM. dd').format(_targetDate), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), Icon(Icons.arrow_drop_down, size: 18, color: mainColor)]))),
+        Expanded(
+          child: InkWell(
+            onTap: () => _selectDate(), 
+            child: Row(children: [
+              Icon(Icons.calendar_today, size: 16, color: mainColor), 
+              const SizedBox(width: 8), 
+              // ✅ 날짜 텍스트 크기 확대
+              Text(DateFormat('yyyy. MM. dd').format(_targetDate), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)), 
+              Icon(Icons.arrow_drop_down, size: 24, color: mainColor)
+            ])
+          )
+        ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8), 
-          height: 28, 
-          decoration: BoxDecoration(color: mainColor.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(6)),
-          child: DropdownButtonHideUnderline(child: (isFull || isGrade) ? DropdownButton<String>(value: _currentCell, iconSize: 16, items: [if (isFull) const DropdownMenuItem(value: 'teachers', child: Text('교사전체', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), ...allowed.map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))))], onChanged: (val) { if (val != null) setState(() { _currentCell = val; _loadData(); }); }) : Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(_currentCell == 'teachers' ? '교사전체' : '${_currentCell.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))))),
+          padding: const EdgeInsets.symmetric(horizontal: 12), 
+          // ✅ 셀 선택 박스 높이 확대
+          height: 38, 
+          decoration: BoxDecoration(color: mainColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: mainColor.withValues(alpha: 0.2))),
+          child: DropdownButtonHideUnderline(
+            child: (isFull || isGrade) ? DropdownButton<String>(
+              value: _currentCell, 
+              iconSize: 22, 
+              // ✅ 드롭다운 글자 크기 확대
+              items: [
+                if (isFull) const DropdownMenuItem(value: 'teachers', child: Text('교사전체', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))), 
+                ...allowed.map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))))
+              ], 
+              onChanged: (val) { if (val != null) setState(() { _currentCell = val; _loadData(); }); }
+            ) : Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6), 
+                child: Text(_currentCell == 'teachers' ? '교사전체' : '${_currentCell.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold))
+            )
+          )
+        ),
       ]),
     );
   }
@@ -318,21 +351,39 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   Widget _buildSummaryArea(Color mC) { 
     int pC = _attendanceData.values.where((e) => e['status'] == '출석').length; 
     int aC = _attendanceData.values.where((e) => e['status'] != '출석').length; 
-    return Container(padding: const EdgeInsets.symmetric(vertical: 6), color: Colors.grey.shade50, child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_sumItem('전체', _memberNames.length, Colors.blueGrey), _sumItem('출석', pC, mC), _sumItem('결석', aC, Colors.red.shade400)])); 
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10), 
+      color: Colors.grey.shade50, 
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly, 
+        children: [
+          _sumItem('전체', _memberNames.length, Colors.blueGrey), 
+          _sumItem('출석', pC, mC), 
+          _sumItem('결석', aC, Colors.red.shade400)
+        ]
+      )
+    ); 
   }
 
-  Widget _sumItem(String l, int c, Color clr) { return Column(children: [Text(l, style: TextStyle(fontSize: 9, color: clr)), Text('$c명', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: clr))]); }
+  Widget _sumItem(String l, int c, Color clr) { 
+    return Column(children: [
+      Text(l, style: TextStyle(fontSize: 11, color: clr, fontWeight: FontWeight.w500)), 
+      Text('$c명', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: clr))
+    ]); 
+  }
 
   Widget _buildReasonDropdown(String n, Map<String, dynamic> d) { 
     return Container(
-      height: 32, 
-      padding: const EdgeInsets.symmetric(horizontal: 8), 
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: Colors.red.shade100)), 
+      // ✅ 결석 사유 드롭다운 높이 확대
+      height: 42, 
+      padding: const EdgeInsets.symmetric(horizontal: 10), 
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.shade100, width: 1.2)), 
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true, 
           value: _absenceReasons.contains(d['reason']) ? d['reason'] : '기타', 
-          items: _absenceReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(), 
+          // ✅ 결석 사유 글자 크기 확대
+          items: _absenceReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 15)))).toList(), 
           onChanged: (v) { 
             if (v != null) {
               setState(() => _attendanceData[n]!['reason'] = v);
@@ -343,17 +394,33 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     ); 
   }
 
-  Widget _buildCustomReasonField(String n) { return SizedBox(height: 32, child: TextField(controller: _customReasonControllers[n], decoration: InputDecoration(hintText: "결석 사유 입력", isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)), filled: true, fillColor: Colors.white), style: const TextStyle(fontSize: 12))); }
+  Widget _buildCustomReasonField(String n) { 
+    return SizedBox(
+      height: 42, 
+      child: TextField(
+        controller: _customReasonControllers[n], 
+        decoration: InputDecoration(
+          hintText: "결석 사유 직접 입력", 
+          isDense: true, 
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), 
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), 
+          filled: true, 
+          fillColor: Colors.white
+        ), 
+        style: const TextStyle(fontSize: 14)
+      )
+    ); 
+  }
 
   Widget _buildActionButtons(Color mC, bool isT) { 
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      if (!isT) OutlinedButton.icon(onPressed: _addNewStudent, icon: const Icon(Icons.person_add, size: 14), label: const Text("새친구 등록", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: OutlinedButton.styleFrom(foregroundColor: mC, side: BorderSide(color: mC), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))), 
-      if (!isT) const SizedBox(width: 10), 
-      ElevatedButton.icon(onPressed: _isLoading ? null : _saveAttendance, icon: const Icon(Icons.save, size: 14), label: const Text("출석 저장", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: ElevatedButton.styleFrom(backgroundColor: mC, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))))
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 30), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      if (!isT) OutlinedButton.icon(onPressed: _addNewStudent, icon: const Icon(Icons.person_add, size: 16), label: const Text("새친구 등록", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), style: OutlinedButton.styleFrom(foregroundColor: mC, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), side: BorderSide(color: mC, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))), 
+      if (!isT) const SizedBox(width: 12), 
+      ElevatedButton.icon(onPressed: _isLoading ? null : _saveAttendance, icon: const Icon(Icons.save, size: 16), label: const Text("출석 저장", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), style: ElevatedButton.styleFrom(backgroundColor: mC, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))
     ])); 
   }
 
-  Widget _miniStatusToggle(String n, bool isP, Color mC) { return Row(mainAxisSize: MainAxisSize.min, children: [_miniButton(n, '출석', isP, mC), const SizedBox(width: 3), _miniButton(n, '결석', !isP, Colors.red.shade400)]); }
+  Widget _miniStatusToggle(String n, bool isP, Color mC) { return Row(mainAxisSize: MainAxisSize.min, children: [_miniButton(n, '출석', isP, mC), const SizedBox(width: 6), _miniButton(n, '결석', !isP, Colors.red.shade400)]); }
 
   Widget _miniButton(String n, String l, bool s, Color c) { 
     return GestureDetector(
@@ -362,7 +429,12 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           setState(() => _attendanceData[n]!['status'] = l);
         }
       }, 
-      child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: s ? c : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(l, style: TextStyle(color: s ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 11)))
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8), 
+        decoration: BoxDecoration(color: s ? c : Colors.grey.shade100, borderRadius: BorderRadius.circular(8), border: Border.all(color: s ? c : Colors.grey.shade200)), 
+        // ✅ 출석/결석 버튼 글자 크기 확대
+        child: Text(l, style: TextStyle(color: s ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13))
+      )
     ); 
   }
 
