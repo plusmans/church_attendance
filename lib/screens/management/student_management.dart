@@ -10,14 +10,14 @@ class StudentManagementScreen extends StatefulWidget {
   final String teacherName;
   final String teacherCell;
   final String teacherRole;
-  final String teacherGrade; // ✅ 선택적 인자로 활용하기 위해 필수(required) 제거
+  final String teacherGrade;
 
   const StudentManagementScreen({
     super.key,
     required this.teacherName,
     required this.teacherCell,
     required this.teacherRole,
-    this.teacherGrade = '1학년', // ✅ 기본값을 부여하여 home_navigation.dart의 에러 해결
+    this.teacherGrade = '1학년',
   });
 
   @override
@@ -39,7 +39,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _myGrade = widget.teacherGrade; // ✅ 초기 학년 설정
+    _myGrade = widget.teacherGrade;
     _loadInitialData();
   }
 
@@ -59,15 +59,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
           .toList();
       _allTeachers = tSnap.docs.map((doc) => doc.data()).toList();
 
-      String myGrade = widget.teacherGrade; // ✅ 위젯에서 받은 값을 기본으로 사용
+      String myGrade = widget.teacherGrade;
       final myInfo = _allTeachers.firstWhere(
         (t) => t['name'] == widget.teacherName,
         orElse: () => {},
       );
       if (myInfo.isNotEmpty) {
         myGrade = myInfo['grade'] ?? widget.teacherGrade;
-        // 부장님의 경우 grade가 '공통' 등으로 되어있을 수 있으므로 UI 표시용으론 그대로 두되,
-        // 등록 창 전달시엔 나중에 보정함
         _myGrade = myGrade;
       }
 
@@ -97,14 +95,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
         _selectedCell = '전체';
       }
     } else if (widget.teacherCell == '담당') {
-      if (myGrade.contains('1'))
+      if (myGrade.contains('1')) {
         _availableCells = ['1', '2'];
-      else if (myGrade.contains('2'))
+      } else if (myGrade.contains('2')) {
         _availableCells = ['3', '4', '5', '6'];
-      else if (myGrade.contains('3'))
+      } else if (myGrade.contains('3')) {
         _availableCells = ['7', '8', '9', '10'];
-      else
+      } else {
         _availableCells = [widget.teacherCell];
+      }
       _selectedCell = _availableCells.first;
     } else {
       _availableCells = [widget.teacherCell];
@@ -117,6 +116,8 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   Future<void> _promoteStudent(Map<String, dynamic> s) async {
     int attendance = s['attendanceCount'] ?? 0;
     String autoDate = _getToday();
+    
+    // ✅ Async gap 해결을 위해 ScaffoldMessenger를 비동기 호출 전에 미리 참조
     final messenger = ScaffoldMessenger.of(context);
 
     bool? confirm = await showDialog<bool>(
@@ -172,7 +173,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
               'promotedAt': autoDate,
               'updatedAt': FieldValue.serverTimestamp(),
             });
+        
+        // ✅ context.mounted 체크를 통해 unrelated mounted check 해결
+        if (!context.mounted) return;
+        
         await _loadInitialData();
+        
+        // ✅ 미리 저장해둔 messenger 사용
         messenger.showSnackBar(
           SnackBar(content: Text("${s['name']} 학생이 등반되었습니다!")),
         );
@@ -376,37 +383,43 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     );
   }
 
-  // 💡 핵심 수정 부분: 다이얼로그 호출 시 전달값 검증 및 보정
   void _showAddNewFriendDialog() {
     String sanitizedCell = _selectedCell ?? '1';
     
-    // 1. 셀 값 보정: '전체'나 숫자가 아닌 값이 들어오면 '1'로 보정합니다.
     if (sanitizedCell == '전체' || int.tryParse(sanitizedCell) == null) {
       sanitizedCell = '1';
     }
 
-    // 2. 학년 값 보정: 부장님의 경우 _myGrade가 '공통'일 수 있는데, 다이얼로그 드롭다운에는 '1학년'~'3학년'만 있습니다.
     String sanitizedGrade = _myGrade;
     if (!['1학년', '2학년', '3학년'].contains(sanitizedGrade)) {
-      sanitizedGrade = '1학년'; // 다이얼로그에서 에러가 나지 않도록 기본값 설정
+      sanitizedGrade = '1학년'; 
     }
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StudentRegistrationDialog(
-        initialCell: sanitizedCell, // 보정된 값 전달
-        teacherRole: widget.teacherRole,
-        teacherGrade: sanitizedGrade, // 보정된 학년 전달
-        onRegistered: (docId, finalName) async {
-          await _loadInitialData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉")),
-            );
-          }
-        },
-      ),
+      builder: (context) {
+        // ✅ context 가드를 위해 미리 확보
+        final messenger = ScaffoldMessenger.of(context);
+        
+        return StudentRegistrationDialog(
+          initialCell: sanitizedCell, 
+          teacherRole: widget.teacherRole,
+          teacherGrade: sanitizedGrade, 
+          onRegistered: (docId, finalName) async {
+            // ✅ context.mounted를 직접 체크하여 Lint 해결
+            if (!context.mounted) return;
+            
+            await _loadInitialData();
+            
+            if (context.mounted) {
+              messenger.showSnackBar(
+                SnackBar(content: Text("$finalName 새친구가 등록되었습니다! 🎉")),
+              );
+            }
+          },
+        );
+      },
     );
   }
 
@@ -416,7 +429,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: color.withOpacity(0.3), width: 1.5),
+          bottom: BorderSide(
+            color: color.withValues(alpha: 0.3), 
+            width: 1.5,
+          ),
         ),
       ),
       child: Text(
@@ -673,11 +689,11 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
+                          color: Colors.white.withValues(alpha: 0.15), 
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(
-                          "${p['name']} (${_selectedBirthMonth}/${p['birthDay']})",
+                          "${p['name']} ($_selectedBirthMonth/${p['birthDay']})", 
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 9,
@@ -1121,174 +1137,151 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   void _showEditDialog(Map<String, dynamic> s) {
-    final messenger = ScaffoldMessenger.of(context);
-    final nameController = TextEditingController(
-      text: s['name']?.toString() ?? '',
-    );
-    final phoneController = TextEditingController(
-      text: s['phone']?.toString() ?? '',
-    );
-    final firstVisitDateController = TextEditingController(
-      text: s['firstVisitDate']?.toString() ?? '',
-    );
-    final evangelistController = TextEditingController(
-      text: s['evangelist']?.toString() ?? '',
-    );
-    final churchNameController = TextEditingController(
-      text: s['churchName']?.toString() ?? '',
-    );
-    final birthDateController = TextEditingController(
-      text: s['birthDate']?.toString() ?? '',
-    );
-    final schoolController = TextEditingController(
-      text: s['school']?.toString() ?? '',
-    );
-    final addressController = TextEditingController(
-      text: s['address']?.toString() ?? '',
-    );
-    final parentNameController = TextEditingController(
-      text: s['parentName']?.toString() ?? '',
-    );
-    final parentPhoneController = TextEditingController(
-      text: s['parentPhone']?.toString() ?? '',
-    );
-    final mbtiController = TextEditingController(
-      text: s['mbti']?.toString() ?? '',
-    );
-    final siblingsController = TextEditingController(
-      text: s['siblings']?.toString() ?? '',
-    );
-    final churchFriendsController = TextEditingController(
-      text: s['churchFriends']?.toString() ?? '',
-    );
-    final notesController = TextEditingController(
-      text: (s['notes'] ?? s['remarks'])?.toString() ?? '',
-    );
+    final nameController = TextEditingController(text: s['name']?.toString() ?? '');
+    final phoneController = TextEditingController(text: s['phone']?.toString() ?? '');
+    final firstVisitDateController = TextEditingController(text: s['firstVisitDate']?.toString() ?? '');
+    final evangelistController = TextEditingController(text: s['evangelist']?.toString() ?? '');
+    final churchNameController = TextEditingController(text: s['churchName']?.toString() ?? '');
+    final birthDateController = TextEditingController(text: s['birthDate']?.toString() ?? '');
+    final schoolController = TextEditingController(text: s['school']?.toString() ?? '');
+    final addressController = TextEditingController(text: s['address']?.toString() ?? '');
+    final parentNameController = TextEditingController(text: s['parentName']?.toString() ?? '');
+    final parentPhoneController = TextEditingController(text: s['parentPhone']?.toString() ?? '');
+    final mbtiController = TextEditingController(text: s['mbti']?.toString() ?? '');
+    final siblingsController = TextEditingController(text: s['siblings']?.toString() ?? '');
+    final churchFriendsController = TextEditingController(text: s['churchFriends']?.toString() ?? '');
+    final notesController = TextEditingController(text: (s['notes'] ?? s['remarks'])?.toString() ?? '');
 
     final List<String> genderOptions = ['남자', '여자'];
     final List<String> roleOptions = ['학생', '새친구'];
     final List<String> baptismOptions = ['모름', '학습', '세례', '입교', '해당없음'];
     final List<String> churchExpOptions = ['유', '무'];
 
-    String currentGender = genderOptions.contains(s['gender'])
-        ? s['gender']
-        : '남자';
+    String currentGender = genderOptions.contains(s['gender']) ? s['gender'] : '남자';
     String currentRole = roleOptions.contains(s['role']) ? s['role'] : '학생';
-    String currentBaptism = baptismOptions.contains(s['baptismStatus'])
-        ? s['baptismStatus']
-        : '해당없음';
-    String currentChurchExp = churchExpOptions.contains(s['churchExperience'])
-        ? s['churchExperience']
-        : '유';
+    String currentBaptism = baptismOptions.contains(s['baptismStatus']) ? s['baptismStatus'] : '해당없음';
+    String currentChurchExp = churchExpOptions.contains(s['churchExperience']) ? s['churchExperience'] : '유';
 
     showDialog(
       context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (stfCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          title: Text(
-            "${s['name'] ?? '학생'} 정보 수정",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.9,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _editField("이름", nameController),
-                  _editField("본인 전화", phoneController),
-                  _editField("생년월일", birthDateController),
-                  _dropdownField(
-                    "성별",
-                    currentGender,
-                    genderOptions,
-                    (val) => setDialogState(() => currentGender = val!),
-                  ),
-                  _dropdownField(
-                    "역할",
-                    currentRole,
-                    roleOptions,
-                    (val) => setDialogState(() => currentRole = val!),
-                  ),
-                  _editField("첫 방문일", firstVisitDateController),
-                  _editField("인도자", evangelistController),
-                  _dropdownField(
-                    "신앙경험",
-                    currentChurchExp,
-                    churchExpOptions,
-                    (val) => setDialogState(() => currentChurchExp = val!),
-                  ),
-                  _editField("학교", schoolController),
-                  _editField("주소", addressController),
-                  const Divider(height: 24),
-                  _editField("보호자 성함", parentNameController),
-                  _editField("보호자 전화", parentPhoneController),
-                  _editField("부모님 출석교회", churchNameController),
-                  _dropdownField(
-                    "세례 상태",
-                    currentBaptism,
-                    baptismOptions,
-                    (val) => setDialogState(() => currentBaptism = val!),
-                  ),
-                  _editField("MBTI", mbtiController),
-                  _editField("형제관계", siblingsController),
-                  _editField("교회친구", churchFriendsController),
-                  _editField("비고(메모)", notesController, maxLines: 3),
-                ],
+      builder: (dialogCtx) {
+        // ✅ context 가드를 위해 미리 확보
+        final outerNavigator = Navigator.of(context);
+        final innerMessenger = ScaffoldMessenger.of(context);
+        
+        return StatefulBuilder(
+          builder: (stfCtx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Text(
+              "${s['name'] ?? '학생'} 정보 수정",
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _editField("이름", nameController),
+                    _editField("본인 전화", phoneController),
+                    _editField("생년월일", birthDateController),
+                    _dropdownField(
+                      "성별",
+                      currentGender,
+                      genderOptions,
+                      (val) => setDialogState(() => currentGender = val!),
+                    ),
+                    _dropdownField(
+                      "역할",
+                      currentRole,
+                      roleOptions,
+                      (val) => setDialogState(() => currentRole = val!),
+                    ),
+                    _editField("첫 방문일", firstVisitDateController),
+                    _editField("인도자", evangelistController),
+                    _dropdownField(
+                      "신앙경험",
+                      currentChurchExp,
+                      churchExpOptions,
+                      (val) => setDialogState(() => currentChurchExp = val!),
+                    ),
+                    _editField("학교", schoolController),
+                    _editField("주소", addressController),
+                    const Divider(height: 24),
+                    _editField("보호자 성함", parentNameController),
+                    _editField("보호자 전화", parentPhoneController),
+                    _editField("부모님 출석교회", churchNameController),
+                    _dropdownField(
+                      "세례 상태",
+                      currentBaptism,
+                      baptismOptions,
+                      (val) => setDialogState(() => currentBaptism = val!),
+                    ),
+                    _editField("MBTI", mbtiController),
+                    _editField("형제관계", siblingsController),
+                    _editField("교회친구", churchFriendsController),
+                    _editField("비고(메모)", notesController, maxLines: 3),
+                  ],
+                ),
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(stfCtx),
+                child: const Text("취소"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('students')
+                        .doc(s['docId'])
+                        .update({
+                          'name': nameController.text.trim(),
+                          'phone': phoneController.text.trim(),
+                          'gender': currentGender,
+                          'role': currentRole,
+                          'firstVisitDate': firstVisitDateController.text.trim(),
+                          'birthDate' : birthDateController.text.trim(),
+                          'evangelist': evangelistController.text.trim(),
+                          'churchExperience': currentChurchExp,
+                          'school': schoolController.text.trim(),
+                          'address': addressController.text.trim(),
+                          'parentName': parentNameController.text.trim(),
+                          'parentPhone': parentPhoneController.text.trim(),
+                          'churchName': churchNameController.text.trim(),
+                          'isBaptized': ['세례', '입교'].contains(currentBaptism),
+                          'baptismStatus': currentBaptism,
+                          'mbti': mbtiController.text.trim(),
+                          'siblings': siblingsController.text.trim(),
+                          'churchFriends': churchFriendsController.text.trim(),
+                          'notes': notesController.text.trim(),
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
+                    
+                    // ✅ context.mounted 체크
+                    if (!context.mounted) return;
+                    
+                    // 미리 확보한 navigator 사용
+                    outerNavigator.pop();
+                    
+                    await _loadInitialData();
+                    
+                    innerMessenger.showSnackBar(
+                      const SnackBar(content: Text("저장되었습니다.")),
+                    );
+                  } catch (e) {
+                    innerMessenger.showSnackBar(SnackBar(content: Text("오류: $e")));
+                  }
+                },
+                child: const Text("저장"),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(stfCtx),
-              child: const Text("취소"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('students')
-                      .doc(s['docId'])
-                      .update({
-                        'name': nameController.text.trim(),
-                        'phone': phoneController.text.trim(),
-                        'gender': currentGender,
-                        'role': currentRole,
-                        'firstVisitDate': firstVisitDateController.text.trim(),
-                        'birthDate' : birthDateController.text.trim(),
-                        'evangelist': evangelistController.text.trim(),
-                        'churchExperience': currentChurchExp,
-                        'school': schoolController.text.trim(),
-                        'address': addressController.text.trim(),
-                        'parentName': parentNameController.text.trim(),
-                        'parentPhone': parentPhoneController.text.trim(),
-                        'churchName': churchNameController.text.trim(),
-                        'isBaptized': ['세례', '입교'].contains(currentBaptism),
-                        'baptismStatus': currentBaptism,
-                        'mbti': mbtiController.text.trim(),
-                        'siblings': siblingsController.text.trim(),
-                        'churchFriends': churchFriendsController.text.trim(),
-                        'notes': notesController.text.trim(),
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                  if (!mounted) return;
-                  Navigator.pop(stfCtx);
-                  await _loadInitialData();
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text("저장되었습니다.")),
-                  );
-                } catch (e) {
-                  messenger.showSnackBar(SnackBar(content: Text("오류: $e")));
-                }
-              },
-              child: const Text("저장"),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1326,7 +1319,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: DropdownButtonFormField<String>(
-        value: value,
+        initialValue: value, 
         style: const TextStyle(fontSize: 13, color: Colors.black),
         decoration: InputDecoration(
           labelText: label,
@@ -1441,12 +1434,15 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   }
 
   Future<void> _makeCall(String? phoneNumber) async {
-    if (phoneNumber == null || phoneNumber == '-' || phoneNumber.isEmpty)
+    if (phoneNumber == null || phoneNumber == '-' || phoneNumber.isEmpty) {
       return;
+    }
     try {
       final String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
       final Uri url = Uri.parse('tel:$cleanNumber');
-      if (await canLaunchUrl(url)) await launchUrl(url);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url);
+      }
     } catch (e) {
       debugPrint("전화 걸기 오류: $e");
     }

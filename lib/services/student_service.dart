@@ -85,7 +85,8 @@ class StudentService {
     String grade, 
     String name
   ) async {
-    String baseId = "${cell}셀_${grade}_$name";
+    // [수정] 불필요한 중괄호 제거 (Lint: unnecessary_brace_in_string_interps)
+    String baseId = "$cell셀_${grade}_$name";
     
     // 첫 번째 시도: 기본 ID 확인
     var doc = await _db.collection('students').doc(baseId).get();
@@ -97,7 +98,8 @@ class StudentService {
     List<String> suffixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
     for (String suffix in suffixes) {
       String candidateName = "$name$suffix";
-      String candidateId = "${cell}셀_${grade}_$candidateName";
+      // [수정] 불필요한 중괄호 제거 (Lint: unnecessary_brace_in_string_interps)
+      String candidateId = "$cell셀_${grade}_$candidateName";
       
       var checkDoc = await _db.collection('students').doc(candidateId).get();
       if (!checkDoc.exists) {
@@ -107,8 +109,9 @@ class StudentService {
 
     // 모든 접미사가 사용 중일 경우 최후의 수단으로 타임스탬프 사용
     String timestampName = "$name${DateTime.now().millisecondsSinceEpoch % 10000}";
+    // [수정] 불필요한 중괄호 제거 (Lint: unnecessary_brace_in_string_interps)
     return {
-      "docId": "${cell}셀_${grade}_$timestampName",
+      "docId": "$cell셀_${grade}_$timestampName",
       "name": timestampName
     };
   }

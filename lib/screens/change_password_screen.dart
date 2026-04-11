@@ -127,11 +127,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 상단 아이콘 (크기 축소)
+                // 상단 아이콘
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.teal.withOpacity(0.08),
+                    // ✅ withOpacity -> withValues(alpha: 0.08)로 수정
+                    color: Colors.teal.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -159,16 +160,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 입력 카드 섹션 (너비 및 패딩 축소)
+                // 입력 카드 섹션
                 Container(
-                  width: size.width * 0.85, // 전체적인 테이블 크기(너비) 축소
+                  width: size.width * 0.85,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
+                        // ✅ withOpacity -> withValues(alpha: 0.03)로 수정
+                        color: Colors.black.withValues(alpha: 0.03),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -185,9 +187,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           () => _isOldPasswordVisible = !_isOldPasswordVisible,
                         ),
                       ),
-                      const SizedBox(height: 12), // 간격 축소
+                      const SizedBox(height: 12),
                       const Divider(color: Color(0xFFF1F3F4), height: 1),
-                      const SizedBox(height: 12), // 간격 축소
+                      const SizedBox(height: 12),
                       _buildPasswordField(
                         controller: _pwController,
                         label: '새 비밀번호',
@@ -197,7 +199,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           () => _isNewPasswordVisible = !_isNewPasswordVisible,
                         ),
                       ),
-                      const SizedBox(height: 10), // 필드 간 간격 축소
+                      const SizedBox(height: 10),
                       _buildPasswordField(
                         controller: _confirmController,
                         label: '새 비밀번호 확인',
@@ -213,10 +215,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 실행 버튼 (크기 축소)
+                // 실행 버튼
                 SizedBox(
-                  width: size.width * 0.55, // 너비 축소
-                  height: 44, // 높이 축소
+                  width: size.width * 0.55,
+                  height: 44,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _updatePassword,
                     style: ElevatedButton.styleFrom(

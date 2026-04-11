@@ -58,7 +58,8 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      // ✅ withOpacity -> withValues(alpha: 0.03)로 수정
+                      color: Colors.black.withValues(alpha: 0.03),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -73,7 +74,8 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
                         width: 28,
                         height: 28,
                         decoration: BoxDecoration(
-                          color: Colors.teal.withOpacity(0.1),
+                          // ✅ withOpacity -> withValues(alpha: 0.1)로 수정
+                          color: Colors.teal.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -218,13 +220,17 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
   }
 
   // 초기화 확인 팝업 (모바일 최적화)
-  void _showResetDialog(BuildContext context, String docId, String name) {
+  void _showResetDialog(BuildContext context, String docId, String? name) {
+    // ✅ 비동기 작업 전에 ScaffoldMessenger와 Navigator 상태를 미리 확보하여 async gap 이슈 해결
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          '$name 선생님 계정 초기화',
+          '${name ?? '교사'} 계정 초기화',
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
         ),
         content: const Text(
@@ -240,13 +246,18 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('teachers')
-                  .doc(docId)
-                  .update({'isFirstLogin': true});
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
+              try {
+                await FirebaseFirestore.instance
+                    .collection('teachers')
+                    .doc(docId)
+                    .update({'isFirstLogin': true});
+                
+                // ✅ 비동기 작업(await) 직후에 mounted 상태를 확인하여 context 안전성 확보
+                if (!mounted) return;
+                
+                // 미리 참조해둔 navigator와 messenger를 사용하여 경고 해결
+                navigator.pop();
+                messenger.showSnackBar(
                   SnackBar(
                     content: const Text('초기화 상태로 변경되었습니다.'),
                     behavior: SnackBarBehavior.floating,
@@ -254,6 +265,11 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text('오류 발생: $e')),
                 );
               }
             },

@@ -55,7 +55,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
   };
 
   // 권한 판별 Getters
-  bool get _isAdmin => widget.teacherRole.trim() == 'admin';
   bool get _isFullAccess => 
       ['admin', '강도사', '부장', '개발자'].contains(widget.teacherRole.trim());
   bool get _isGradeAdmin => 
@@ -85,13 +84,10 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
     final List<String> cellOptions = List.generate(10, (i) => (i + 1).toString());
 
     if (_isFullAccess) {
-      // admin, 강도사, 부장님은 현재 선택되어 있던 셀을 기본으로 하되, 
-      // '교사', '전체' 등 숫자가 아닌 경우 '1'셀로 시작
       _cell = (widget.initialCell == 'teachers' || widget.initialCell == '전체')
           ? '1'
           : widget.initialCell;
     } else if (_isGradeAdmin) {
-      // 학년담당은 자신의 학년 범위 내의 셀인지 확인 후 초기값 설정
       List<String> allowed = gradeCellMap[role] ?? [];
       if (allowed.contains(widget.initialCell)) {
         _cell = widget.initialCell;
@@ -99,11 +95,9 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
         _cell = allowed.isNotEmpty ? allowed.first : '1';
       }
     } else {
-      // 일반 교사는 본인의 셀로 고정 (학생 등록이므로 teachers는 제외)
       _cell = widget.initialCell == 'teachers' ? '1' : widget.initialCell;
     }
 
-    // 💡 [추가] 최종 안전장치: 결정된 _cell 값이 전체 드롭다운 항목(1~10)에 없는 경우 '1'로 고정
     if (!cellOptions.contains(_cell)) {
       _cell = '1';
     }
@@ -119,7 +113,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // 현재 로그인한 교사가 선택 가능한 셀 목록 구성
     List<String> allowedCellNumbers = [];
     if (_isFullAccess) {
       allowedCellNumbers = List.generate(10, (i) => (i + 1).toString());
@@ -129,7 +122,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
       allowedCellNumbers = [_cell];
     }
 
-    // 💡 빌드 시점 안전장치: _cell이 현재 권한에서 허용된 목록에 없으면 첫 번째 항목 선택
     if (!allowedCellNumbers.contains(_cell)) {
       _cell = allowedCellNumbers.isNotEmpty ? allowedCellNumbers.first : '1';
     }
@@ -183,7 +175,6 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              // ✅ 배정 셀 드롭다운: 보정된 _cell과 allowedCellNumbers 사용
               _buildDropdown(
                 "배정 셀",
                 _cell,
@@ -372,7 +363,8 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(child: Divider(color: color.withOpacity(0.2), thickness: 1)),
+          // ✅ withOpacity -> withValues(alpha: 0.2)로 수정
+          Expanded(child: Divider(color: color.withValues(alpha: 0.2), thickness: 1)),
         ],
       ),
     );
@@ -428,7 +420,8 @@ class _StudentRegistrationDialogState extends State<StudentRegistrationDialog> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: DropdownButtonFormField<String>(
-        value: value,
+        // ✅ value -> initialValue로 수정 (Lint 권장 사항 반영)
+        initialValue: value,
         style: const TextStyle(fontSize: 13, color: Colors.black),
         decoration: InputDecoration(
           labelText: label,
