@@ -11,8 +11,9 @@ class AttendanceStatusScreen extends StatefulWidget {
 }
 
 class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
-  // ✅ 스크롤 제어를 위한 컨트롤러
   final ScrollController _scrollController = ScrollController();
+  // ✅ 출석률 추이 그래프 전용 스크롤 컨트롤러 추가
+  final ScrollController _trendScrollController = ScrollController();
   
   DateTime _selectedDate = _getRecentSunday();
   String _viewType = '주별';
@@ -20,22 +21,20 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   String _individualSortMode = '셀순';
   bool _isLoading = false;
 
-  int _studentPresent = 0;   // 학생 출석 (A+B 포함)
-  int _studentTotal = 0;     // 학생 재적 (A그룹만)
-  int _studentGrandTotal = 0; // 학생 총원 (A+B 포함)
+  int _studentPresent = 0;   
+  int _studentTotal = 0;     
+  int _studentGrandTotal = 0; 
   int _teacherPresent = 0;
   int _teacherTotal = 0;
 
   Map<String, Map<String, dynamic>> _cellStats = {};
   List<Map<String, dynamic>> _summaryList = [];
 
-  // ✅ [수정] prefer_final_fields 해결: 재할당이 없으므로 final 추가
   final Map<String, double> _cellAverages = {}; 
   Map<String, Map<String, dynamic>> _individualStats = {};
 
   Map<String, Map<String, int>> _gradeStats = {};
   Map<String, Map<String, int>> _genderStats = {};
-  // ✅ [수정] unused_field 해결: 사용하지 않는 _gradeGenderStats 삭제
   Map<String, int> _absenceReasonCounts = {};
 
   static DateTime _getRecentSunday() {
@@ -53,6 +52,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _trendScrollController.dispose(); // ✅ 컨트롤러 해제
     super.dispose();
   }
 
@@ -64,6 +64,15 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  // ✅ 그래프를 최신 데이터(오른쪽 끝)로 이동시키는 함수
+  void _scrollToLatestTrend() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_trendScrollController.hasClients) {
+        _trendScrollController.jumpTo(_trendScrollController.position.maxScrollExtent);
+      }
+    });
   }
 
   String _normalizeName(dynamic rawName) {
@@ -82,7 +91,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       '여자': {'p': 0, 't': 0},
     };
     _absenceReasonCounts = {};
-    // ✅ [수정] _gradeGenderStats 초기화 코드 삭제
   }
 
   Future<void> _fetchStats() async {
@@ -128,8 +136,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       _initStatsMaps();
 
       if (_viewType == '주별') {
-        bool isLatest = _selectedDate.isAtSameMomentAs(_getRecentSunday());
-        _processWeeklyData(snapshot, studentMaster, teacherNames, teacherSnap.docs.length, isLatest);
+        _processWeeklyData(snapshot, studentMaster, teacherNames, teacherSnap.docs.length);
       } else {
         _processGroupedData(snapshot, studentMaster, teacherNames, teacherSnap.docs.length);
       }
@@ -149,7 +156,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     }
   }
 
-  void _processWeeklyData(QuerySnapshot snapshot, Map<String, Map<String, dynamic>> master, Set<String> teacherNames, int teacherCount, bool isLatest) {
+  void _processWeeklyData(QuerySnapshot snapshot, Map<String, Map<String, dynamic>> master, Set<String> teacherNames, int teacherCount) {
     final Map<String, Map<String, dynamic>> baseStats = {};
     int sP = 0; 
     int sT = 0; 
@@ -221,14 +228,13 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       });
     }
 
-    _cellAverages.clear(); // 맵 초기화 후 할당
+    _cellAverages.clear();
     baseStats.forEach((cId, stat) {
       final Map<String, dynamic> records = Map<String, dynamic>.from(stat['records'] ?? {});
       int presentInCell = 0;
       records.forEach((name, info) {
         final infoMap = Map<String, dynamic>.from(info);
         final String n = _normalizeName(name);
-        
         bool isTeacher = teacherNames.contains(n) || infoMap['role'] == '교사' || cId == '교사';
         final String role = isTeacher ? '교사' : (infoMap['role'] ?? '학생');
         final String group = (infoMap['group'] ?? 'B').toString().trim().toUpperCase();
@@ -280,6 +286,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   void _processGroupedData(QuerySnapshot snapshot, Map<String, Map<String, dynamic>> master, Set<String> teacherNames, int teacherCount) {
     final Map<String, Map<String, int>> dateSummary = {};
     final Map<String, Map<String, dynamic>> indv = {};
+    final Map<String, Map<String, int>> cellGroupStats = {};
 
     final String todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     int currentTotalA = 0;
@@ -319,8 +326,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           final String sex = (infoMap['gender'] ?? (master[n]?['gender'] ?? '남자')).toString();
           final String group = (infoMap['group'] ?? 'B').toString().trim().toUpperCase();
 
+          if (!cellGroupStats.containsKey(cell)) cellGroupStats[cell] = {'p': 0, 't': 0};
+
           if (isP) {
             dateSummary[date]!['sP'] = (dateSummary[date]!['sP'] ?? 0) + 1;
+            cellGroupStats[cell]!['p'] = cellGroupStats[cell]!['p']! + 1;
             if (_gradeStats.containsKey(g)) _gradeStats[g]!['p'] = (_gradeStats[g]!['p'] ?? 0) + 1;
             if (_genderStats.containsKey(sex)) _genderStats[sex]!['p'] = (_genderStats[sex]!['p'] ?? 0) + 1;
           } else if (group == 'A') {
@@ -329,6 +339,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           
           if (group == 'A') {
             dateSummary[date]!['sT'] = (dateSummary[date]!['sT'] ?? 0) + 1;
+            cellGroupStats[cell]!['t'] = cellGroupStats[cell]!['t']! + 1;
             if (_gradeStats.containsKey(g)) _gradeStats[g]!['t'] = (_gradeStats[g]!['t'] ?? 0) + 1;
             if (_genderStats.containsKey(sex)) _genderStats[sex]!['t'] = (_genderStats[sex]!['t'] ?? 0) + 1;
           }
@@ -346,11 +357,21 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         
         if (infoMap.containsKey('firstVisitDate')) indv[n]!['firstVisitDate'] = infoMap['firstVisitDate'];
         if (infoMap.containsKey('promotedAt')) indv[n]!['promotedAt'] = infoMap['promotedAt'];
+        if (infoMap.containsKey('evangelist')) indv[n]!['evangelist'] = infoMap['evangelist']; 
       });
     }
 
     _summaryList = dateSummary.entries.map((e) => {'date': e.key, ...e.value}).toList()
       ..sort((a, b) => (b['date'] as String).compareTo(a['date'] as String));
+
+    _cellAverages.clear();
+    cellGroupStats.forEach((cId, stat) {
+      if (stat['t']! > 0) {
+        _cellAverages[cId] = stat['p']! / stat['t']!;
+      } else {
+        _cellAverages[cId] = 0.0;
+      }
+    });
 
     final double dayCount = _summaryList.length.toDouble();
     if (dayCount > 0) {
@@ -372,6 +393,9 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       _teacherTotal = teacherCount;
       _teacherPresent = _summaryList.isEmpty ? 0 : (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
     });
+
+    // ✅ 데이터 처리가 끝나면 그래프를 최신순으로 스크롤
+    _scrollToLatestTrend();
   }
 
   @override
@@ -609,18 +633,42 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
   Widget _buildTrendChart() {
     final sortedTrend = List.from(_summaryList).reversed.toList();
-    return Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withValues(alpha: 0.05))),
+    return Container(
+      padding: const EdgeInsets.all(14), 
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withValues(alpha: 0.05))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('출석률 추이', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.blue)),
         const SizedBox(height: 16),
-        SizedBox(height: 100, child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, crossAxisAlignment: CrossAxisAlignment.end, children: sortedTrend.map((i) {
-          final double r = (i['sP'] ?? 0) > 0 ? (i['sP'] / (i['sT'] ?? 1)) : 0;
-          return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Text('${(r * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
-            Container(width: 18, height: (r.clamp(0.0, 1.2) * 60) + 4, decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4))),
-            Text((i['date'] as String).substring(5), style: const TextStyle(fontSize: 9, color: Colors.grey)),
-          ]);
-        }).toList())),
+        // ✅ [수정] 가로 스크롤 적용 및 최신순 노출
+        SingleChildScrollView(
+          controller: _trendScrollController,
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start, 
+            crossAxisAlignment: CrossAxisAlignment.end, 
+            children: sortedTrend.map((i) {
+              final double r = (i['sP'] ?? 0) > 0 ? (i['sP'] / (i['sT'] ?? 1)) : 0;
+              return Container(
+                width: 50, // ✅ 각 항목당 고정 너비 지정 (10개가 한 화면에 보이기 좋은 수치)
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end, 
+                  children: [
+                    Text('${(r * 100).toInt()}%', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blue)),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 18, 
+                      height: (r.clamp(0.0, 1.2) * 60) + 4, 
+                      decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4))
+                    ),
+                    const SizedBox(height: 6),
+                    Text((i['date'] as String).substring(5).replaceAll('-', '/'), style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  ]
+                ),
+              );
+            }).toList()
+          ),
+        ),
       ]),
     );
   }
@@ -646,7 +694,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   }
 
   Widget _buildIndividualList() {
-    // ✅ [수정] role != '교사' 조건 적용
     final studentList = _individualStats.values.where((m) => m['role'] != '교사').toList();
     if (_individualSortMode == '랭킹순') {
       studentList.sort((a, b) => (((b['p'] ?? 0) as num) / ((b['t'] ?? 1) as num)).compareTo(((a['p'] ?? 0) as num) / ((a['t'] ?? 1) as num)));
@@ -723,8 +770,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final entries = r.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     if (isT) {
       return Wrap(spacing: 8, runSpacing: 8, children: entries.map((i) {
-        // ✅ [수정] unused_local_variable 해결 및 isP 사용
-        final bool isP = i.value['status'] == '출석';
+        final bool isP = i.value['status'] == '출석'; 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
           decoration: BoxDecoration(
@@ -746,8 +792,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final gB = entries.where((i) => (i.value['group'] ?? 'A') == 'B').toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (gA.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: gA.map((i) {
-        // ✅ [수정] unused_local_variable 해결 및 isP 사용
-        final bool isP = i.value['status'] == '출석';
+        final bool isP = i.value['status'] == '출석'; 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
           decoration: BoxDecoration(
@@ -793,7 +838,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget _buildPastoralSections() {
     final String dateFilter = _viewType == '누적' ? DateFormat('yyyy').format(_selectedDate) : DateFormat('yyyy-MM').format(_selectedDate);
     
-    // ✅ [수정] role != '교사' 조건 적용
     final perfectStudents = _individualStats.values.where((m) => m['role'] != '교사' && m['p'] == m['t'] && m['t'] > 0).toList();
     perfectStudents.sort((a, b) {
       int cellA = int.tryParse(a['cell']?.toString() ?? '99') ?? 99;
@@ -808,6 +852,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     final promoted = _individualStats.values.where((m) => m['role'] != '교사' && (m['promotedAt']?.toString().startsWith(dateFilter) ?? false)).toList();
     final absent = _individualStats.values.where((m) => m['role'] != '교사' && (m['p'] ?? 0) == 0 && (m['t'] ?? 0) > 0).toList();
 
+    final evangelismRecords = _individualStats.values.where((m) => 
+      m['role'] != '교사' && 
+      (m['firstVisitDate']?.toString().startsWith(dateFilter) ?? false) && 
+      (m['evangelist']?.toString().isNotEmpty ?? false)
+    ).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start, 
       children: [
@@ -815,11 +865,33 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         const SizedBox(height: 20), 
         _buildNameListSection("새친구 방문 🎁", first, Colors.orange), 
         const SizedBox(height: 20), 
+        _buildEvangelismSection(evangelismRecords), 
+        const SizedBox(height: 20), 
         _buildNameListSection("등반 소식 🎉", promoted, Colors.indigo), 
         const SizedBox(height: 20), 
         _buildNameListSection("심방 권면 대상 📞", absent, Colors.red)
       ]
     );
+  }
+
+  Widget _buildEvangelismSection(List<Map<String, dynamic>> l) {
+    const Color c = Colors.deepPurple;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Padding(padding: EdgeInsets.only(left: 4, bottom: 8), child: Text("전도 소식 📢", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))), 
+      Container(
+        width: double.infinity, 
+        padding: const EdgeInsets.all(12), 
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.03), borderRadius: BorderRadius.circular(12), border: Border.all(color: c.withValues(alpha: 0.08))), 
+        child: l.isEmpty ? const Text("대상자 없음", style: TextStyle(color: Colors.grey, fontSize: 13)) : Wrap(
+          spacing: 8, runSpacing: 8, 
+          children: l.map((m) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), 
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: c.withValues(alpha: 0.1))), 
+            child: Text("${m['evangelist']} : ${m['name']} (새친구)", style: const TextStyle(fontSize: 13, color: c, fontWeight: FontWeight.bold))
+          )).toList()
+        )
+      )
+    ]);
   }
 
   Widget _buildPerfectAttendanceGroup(List<Map<String, dynamic>> students, List<Map<String, dynamic>> teachers) {
@@ -896,6 +968,12 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   Widget _buildMonthlyInsights() {
     final int studentPerfectCount = _individualStats.values.where((m) => m['role'] != '교사' && m['p'] == m['t'] && m['t'] > 0).length;
     final int teacherPerfectCount = _individualStats.values.where((m) => m['role'] == '교사' && m['p'] == m['t'] && m['t'] > 0).length;
+    
+    final String period = _viewType == '누적' ? DateFormat('yyyy').format(_selectedDate) : DateFormat('yyyy-MM').format(_selectedDate);
+    final int newFriendsCount = _individualStats.values.where((m) => 
+      m['role'] != '교사' && (m['firstVisitDate']?.toString().startsWith(period) ?? false)
+    ).length;
+
     String bestCell = "없음";
     double maxR = -1.0;
     _cellAverages.forEach((c, r) {
@@ -904,6 +982,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         bestCell = "$c셀";
       }
     });
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16), 
       child: Column(
@@ -914,30 +993,21 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             Expanded(child: _insightCard("교사 개근", "$teacherPerfectCount명", Colors.orange)),
           ]),
           const SizedBox(height: 10),
-          if (_viewType == '누적') ...[
-            Builder(builder: (context) {
-              final String year = DateFormat('yyyy').format(_selectedDate);
-              
-              // 분모: 당해 연도에 '첫 방문'한 모든 학생 (교사 제외)
-              final int totalNew = _individualStats.values.where((m) {
-                final bool isNotTeacher = m['role'] != '교사';
-                final String firstVisit = m['firstVisitDate']?.toString() ?? '';
-                return isNotTeacher && firstVisit.startsWith(year);
-              }).length;
-
-              // 분자: 당해 연도에 '등반(정착)'한 모든 학생 (교사 제외)
-              final int promoted = _individualStats.values.where((m) {
-                final bool isNotTeacher = m['role'] != '교사';
-                final String promotedAt = m['promotedAt']?.toString() ?? '';
-                return isNotTeacher && promotedAt.startsWith(year);
-              }).length;
-
-              final double rate = totalNew > 0 ? (promoted / totalNew) * 100 : 0;
-              
-              return _insightCard("연간 정착률", "${rate.toStringAsFixed(1)}%", Colors.indigo);
-            })
-          ] else 
-            _insightCard("최고 출석 셀", bestCell, Colors.teal),
+          Row(children: [
+            Expanded(child: _insightCard("새친구 방문", "$newFriendsCount명", Colors.deepPurple)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _viewType == '누적'
+                ? Builder(builder: (context) {
+                    final String year = DateFormat('yyyy').format(_selectedDate);
+                    final int totalNew = _individualStats.values.where((m) => m['role'] != '교사' && (m['firstVisitDate']?.toString().startsWith(year) ?? false)).length;
+                    final int promoted = _individualStats.values.where((m) => m['role'] != '교사' && (m['promotedAt']?.toString().startsWith(year) ?? false)).length;
+                    final double rate = totalNew > 0 ? (promoted / totalNew) * 100 : 0;
+                    return _insightCard("연간 정착률", "${rate.toStringAsFixed(1)}%", Colors.indigo);
+                  })
+                : _insightCard("최고 출석 셀", bestCell, Colors.teal),
+            ),
+          ]),
         ],
       )
     );
