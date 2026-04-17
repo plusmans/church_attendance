@@ -80,9 +80,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       String dateStr = DateFormat('yyyy-MM-dd').format(_targetDate);
@@ -114,39 +112,50 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
 
       if (doc.exists) {
         Map<String, dynamic> records = Map<String, dynamic>.from(doc.data()?['records'] ?? {});
+        
+        // 데이터 먼저 가공 (그룹 정보를 알아야 정렬이 가능함)
+        final Map<String, Map<String, dynamic>> mappedData = records.map((key, value) {
+          var valMap = Map<String, dynamic>.from(value);
+          String name = key.toString().trim();
+          if (masterInfoMap.containsKey(name)) {
+            valMap['docId'] = masterInfoMap[name]!['docId'];
+            valMap['grade'] = valMap['grade'] ?? masterInfoMap[name]!['grade'];
+            valMap['group'] = valMap['group'] ?? _extractGroup(masterInfoMap[name]!);
+            valMap['role'] = valMap['role'] ?? masterInfoMap[name]!['role'];
+            valMap['cell'] = valMap['cell'] ?? masterInfoMap[name]!['cell'];
+            valMap['gender'] = valMap['gender'] ?? masterInfoMap[name]!['gender'];
+            valMap['firstVisitDate'] = valMap['firstVisitDate'] ?? masterInfoMap[name]!['firstVisitDate'];
+            valMap['evangelist'] = valMap['evangelist'] ?? masterInfoMap[name]!['evangelist'];
+            valMap['promotedAt'] = valMap['promotedAt'] ?? masterInfoMap[name]!['promotedAt'];
+            valMap['school'] = valMap['school'] ?? masterInfoMap[name]!['school'];
+          }
+
+          String loadedReason = valMap['reason'] ?? '연락x';
+          String loadedStatus = valMap['status'] ?? '결석';
+          
+          if (loadedStatus == '결석' && !_absenceReasons.contains(loadedReason)) {
+            _customReasonControllers[key] = TextEditingController(text: loadedReason);
+            valMap['reason'] = '기타'; 
+          } else {
+            _customReasonControllers[key] = TextEditingController(text: valMap['customReason'] ?? '');
+          }
+          _initialStatusMap[key] = loadedStatus;
+          return MapEntry(key, valMap);
+        });
+
+        // ✅ [수정] A그룹 먼저 상단 배치, 그 다음 B그룹 순으로 정렬
+        final sortedNames = mappedData.keys.toList()..sort((a, b) {
+          String groupA = mappedData[a]?['group'] ?? 'A';
+          String groupB = mappedData[b]?['group'] ?? 'A';
+          if (groupA != groupB) {
+            return groupA.compareTo(groupB); // 'A'가 'B'보다 앞섬
+          }
+          return a.compareTo(b); // 그룹이 같으면 이름순 정렬
+        });
+
         setState(() {
-          _memberNames = records.keys.toList()..sort();
-          _attendanceData = records.map((key, value) {
-            var valMap = Map<String, dynamic>.from(value);
-            String name = key.toString().trim();
-            if (masterInfoMap.containsKey(name)) {
-              valMap['docId'] = masterInfoMap[name]!['docId'];
-              valMap['grade'] = valMap['grade'] ?? masterInfoMap[name]!['grade'];
-              valMap['group'] = valMap['group'] ?? _extractGroup(masterInfoMap[name]!);
-              valMap['role'] = valMap['role'] ?? masterInfoMap[name]!['role'];
-              valMap['cell'] = valMap['cell'] ?? masterInfoMap[name]!['cell'];
-              valMap['gender'] = valMap['gender'] ?? masterInfoMap[name]!['gender'];
-              valMap['firstVisitDate'] = valMap['firstVisitDate'] ?? masterInfoMap[name]!['firstVisitDate'];
-              valMap['evangelist'] = valMap['evangelist'] ?? masterInfoMap[name]!['evangelist'];
-              valMap['promotedAt'] = valMap['promotedAt'] ?? masterInfoMap[name]!['promotedAt'];
-              valMap['school'] = valMap['school'] ?? masterInfoMap[name]!['school'];
-            }
-
-            // ✅ 데이터 로드 시 '기타' 사유 복원 로직
-            String loadedReason = valMap['reason'] ?? '연락x';
-            String loadedStatus = valMap['status'] ?? '결석';
-            
-            if (loadedStatus == '결석' && !_absenceReasons.contains(loadedReason)) {
-              // 리스트에 없는 사유면 '기타'로 표시하고 텍스트 필드에 내용 삽입
-              _customReasonControllers[key] = TextEditingController(text: loadedReason);
-              valMap['reason'] = '기타'; 
-            } else {
-              _customReasonControllers[key] = TextEditingController(text: valMap['customReason'] ?? '');
-            }
-
-            _initialStatusMap[key] = loadedStatus;
-            return MapEntry(key, valMap);
-          });
+          _memberNames = sortedNames;
+          _attendanceData = mappedData;
         });
       } else {
         Map<String, Map<String, dynamic>> temp = {};
@@ -168,24 +177,31 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             'school': mData['school'] ?? '',
           };
         });
+
+        // ✅ [수정] 새 문서를 생성할 때도 A그룹 먼저 상단 배치 정렬
+        names.sort((a, b) {
+          String groupA = temp[a]?['group'] ?? 'A';
+          String groupB = temp[b]?['group'] ?? 'A';
+          if (groupA != groupB) {
+            return groupA.compareTo(groupB);
+          }
+          return a.compareTo(b);
+        });
+
         setState(() { 
-          _memberNames = names..sort(); 
+          _memberNames = names; 
           _attendanceData = temp; 
         });
       }
     } catch (e) { 
       debugPrint("❌ 로드 에러: $e"); 
     } finally { 
-      if (mounted) {
-        setState(() => _isLoading = false);
-      } 
+      if (mounted) setState(() => _isLoading = false); 
     }
   }
 
   Future<void> _saveAttendance() async {
-    if (_memberNames.isEmpty || !mounted) {
-      return;
-    }
+    if (_memberNames.isEmpty || !mounted) return;
     setState(() => _isLoading = true);
     
     final messenger = ScaffoldMessenger.of(context);
@@ -203,18 +219,15 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
         if (_attendanceData.containsKey(name)) {
           var currentData = _attendanceData[name]!;
           
-          // ✅ '기타' 사유인 경우 직접 입력 텍스트를 reason 필드에 기록
           String finalReason = currentData['reason'] ?? '연락x';
           if (currentData['status'] == '결석' && finalReason == '기타') {
             finalReason = _customReasonControllers[name]?.text.trim() ?? '기타';
-            if (finalReason.isEmpty) {
-              finalReason = '기타';
-            }
+            if (finalReason.isEmpty) finalReason = '기타';
           }
 
           recordsToSave[name] = {
             'status': currentData['status'] ?? '결석',
-            'reason': finalReason, // ✅ '기타' 입력 내용 반영
+            'reason': finalReason,
             'customReason': _customReasonControllers[name]?.text ?? '',
             'grade': currentData['grade'] ?? '',
             'group': currentData['group'] ?? 'A',
@@ -233,14 +246,12 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
             String? masterId = currentData['docId'];
             if (masterId != null && masterId.isNotEmpty) {
               DocumentReference mRef = FirebaseFirestore.instance.collection('students').doc(masterId);
-              
-              // ✅ 핵심 수정: '출석' 또는 '인정'이면 모두 누적 출석 횟수에 합산
-              bool wasPresent = (oldS == '출석' || oldS == '인정');
-              bool isPresent = (newS == '출석' || newS == '인정');
+              bool oldIsPresent = (oldS == '출석' || oldS == '인정');
+              bool newIsPresent = (newS == '출석' || newS == '인정');
 
-              if (!wasPresent && isPresent) {
+              if (!oldIsPresent && newIsPresent) {
                 batch.update(mRef, {'attendanceCount': FieldValue.increment(1)});
-              } else if (wasPresent && !isPresent) {
+              } else if (oldIsPresent && !newIsPresent) {
                 batch.update(mRef, {'attendanceCount': FieldValue.increment(-1)});
               }
             }
@@ -256,19 +267,13 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       
       if (mounted) { 
         messenger.showSnackBar(const SnackBar(content: Text("💾 저장되었습니다."))); 
-        if (navigator.canPop()) {
-          navigator.pop(true); 
-        }
+        if (navigator.canPop()) navigator.pop(true); 
       }
     } catch (e) { 
       debugPrint("❌ 저장 에러: $e"); 
-      if (mounted) {
-        messenger.showSnackBar(const SnackBar(content: Text("❌ 저장 실패")));
-      }
+      if (mounted) messenger.showSnackBar(const SnackBar(content: Text("❌ 저장 실패")));
     } finally { 
-      if (mounted) {
-        setState(() => _isLoading = false);
-      } 
+      if (mounted) setState(() => _isLoading = false); 
     }
   }
 
@@ -285,6 +290,14 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
           };
           _initialStatusMap[finalName] = '결석'; 
           _customReasonControllers[finalName] = TextEditingController();
+          
+          // 새 학생 등록 후에도 그룹 정렬 유지
+          _memberNames.sort((a, b) {
+            String groupA = _attendanceData[a]?['group'] ?? 'A';
+            String groupB = _attendanceData[b]?['group'] ?? 'A';
+            if (groupA != groupB) return groupA.compareTo(groupB);
+            return a.compareTo(b);
+          });
         });
       },
     ));
@@ -305,9 +318,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 30),
               itemCount: _memberNames.length + 1,
               itemBuilder: (context, index) {
-                if (index == _memberNames.length) {
-                  return _buildActionButtons(mainColor, isTMode);
-                }
+                if (index == _memberNames.length) return _buildActionButtons(mainColor, isTMode);
                 String name = _memberNames[index]; 
                 var data = _attendanceData[name]!; 
                 String status = data['status'] ?? '결석';
@@ -342,9 +353,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
       child: Row(children: [
         Expanded(child: InkWell(onTap: () => _selectDate(), child: Row(children: [Icon(Icons.calendar_today, size: 12, color: mainColor), const SizedBox(width: 6), Text(DateFormat('yyyy. MM. dd').format(_targetDate), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)), Icon(Icons.arrow_drop_down, size: 18, color: mainColor)]))),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8), 
-          height: 28, 
-          decoration: BoxDecoration(color: mainColor.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(6)),
+          padding: const EdgeInsets.symmetric(horizontal: 8), height: 28, decoration: BoxDecoration(color: mainColor.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(6)),
           child: DropdownButtonHideUnderline(child: (isFull || isGrade) ? DropdownButton<String>(value: _currentCell, iconSize: 16, items: [if (isFull) const DropdownMenuItem(value: 'teachers', child: Text('교사전체', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))), ...allowed.map((val) => DropdownMenuItem(value: val, child: Text('${val.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))))], onChanged: (val) { if (val != null) setState(() { _currentCell = val; _loadData(); }); }) : Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(_currentCell == 'teachers' ? '교사전체' : '${_currentCell.padLeft(2, '0')}셀', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))))),
       ]),
     );
@@ -361,31 +370,14 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   Widget _buildReasonDropdown(String n, Map<String, dynamic> d, String status) { 
     List<String> currentReasons = status == '인정' ? _recognizedReasons : _absenceReasons;
     String currentVal = d['reason'] ?? (status == '인정' ? '타교회' : '연락x');
-    
-    if (!currentReasons.contains(currentVal)) {
-      currentVal = '기타';
-    }
+    if (!currentReasons.contains(currentVal)) currentVal = '기타';
 
     return Column(
       children: [
         Container(
-          height: 32, 
-          padding: const EdgeInsets.symmetric(horizontal: 8), 
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: status == '인정' ? Colors.blue.shade100 : Colors.red.shade100)), 
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              isExpanded: true, 
-              value: currentVal, 
-              items: currentReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(), 
-              onChanged: (v) { 
-                if (v != null) {
-                  setState(() => _attendanceData[n]!['reason'] = v);
-                }
-              }
-            )
-          )
+          height: 32, padding: const EdgeInsets.symmetric(horizontal: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: status == '인정' ? Colors.blue.shade100 : Colors.red.shade100)), 
+          child: DropdownButtonHideUnderline(child: DropdownButton<String>(isExpanded: true, value: currentVal, items: currentReasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(), onChanged: (v) { if (v != null) setState(() => _attendanceData[n]!['reason'] = v); }))
         ),
-        // ✅ 결석 상태에서 '기타'를 선택했을 때만 직접 입력 필드 노출
         if (status == '결석' && currentVal == '기타')
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -395,73 +387,23 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
     ); 
   }
 
-  Widget _buildCustomReasonField(String n) { 
-    return SizedBox(
-      height: 32, 
-      child: TextField(
-        controller: _customReasonControllers[n], 
-        decoration: InputDecoration(
-          hintText: "사유를 직접 입력하세요", 
-          isDense: true, 
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), 
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)), 
-          filled: true, 
-          fillColor: Colors.white
-        ), 
-        style: const TextStyle(fontSize: 12)
-      )
-    ); 
-  }
+  Widget _buildCustomReasonField(String n) { return SizedBox(height: 32, child: TextField(controller: _customReasonControllers[n], decoration: InputDecoration(hintText: "사유를 직접 입력하세요", isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)), filled: true, fillColor: Colors.white), style: const TextStyle(fontSize: 12))); }
 
-  Widget _buildActionButtons(Color mC, bool isT) { 
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      if (!isT) OutlinedButton.icon(onPressed: _addNewStudent, icon: const Icon(Icons.person_add, size: 14), label: const Text("새친구 등록", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: OutlinedButton.styleFrom(foregroundColor: mC, side: BorderSide(color: mC), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))), 
-      if (!isT) const SizedBox(width: 10), 
-      ElevatedButton.icon(onPressed: _isLoading ? null : _saveAttendance, icon: const Icon(Icons.save, size: 14), label: const Text("출석 저장", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: ElevatedButton.styleFrom(backgroundColor: mC, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))))
-    ])); 
-  }
+  Widget _buildActionButtons(Color mC, bool isT) { return Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [if (!isT) OutlinedButton.icon(onPressed: _addNewStudent, icon: const Icon(Icons.person_add, size: 14), label: const Text("새친구 등록", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: OutlinedButton.styleFrom(foregroundColor: mC, side: BorderSide(color: mC), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))), if (!isT) const SizedBox(width: 10), ElevatedButton.icon(onPressed: _isLoading ? null : _saveAttendance, icon: const Icon(Icons.save, size: 14), label: const Text("출석 저장", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), style: ElevatedButton.styleFrom(backgroundColor: mC, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))))])); }
 
   Widget _tripleStatusToggle(String n, String status, Color mC) { 
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      _miniButton(n, '출석', status == '출석', mC), 
-      const SizedBox(width: 3), 
-      _miniButton(n, '인정', status == '인정', Colors.blue.shade400),
-      const SizedBox(width: 3),
-      _miniButton(n, '결석', status == '결석', Colors.red.shade400)
-    ]); 
+    return Row(mainAxisSize: MainAxisSize.min, children: [_miniButton(n, '출석', status == '출석', mC), const SizedBox(width: 3), _miniButton(n, '인정', status == '인정', Colors.blue.shade400), const SizedBox(width: 3), _miniButton(n, '결석', status == '결석', Colors.red.shade400)]); 
   }
 
   Widget _miniButton(String n, String l, bool s, Color c) { 
     return GestureDetector(
-      onTap: () { 
-        if (mounted) {
-          setState(() {
-            _attendanceData[n]!['status'] = l;
-            if (l == '인정') {
-              _attendanceData[n]!['reason'] = '타교회';
-            } else if (l == '결석') {
-              _attendanceData[n]!['reason'] = '연락x';
-              _customReasonControllers[n]?.clear(); 
-            }
-          });
-        }
-      }, 
+      onTap: () { if (mounted) setState(() { _attendanceData[n]!['status'] = l; if (l == '인정') _attendanceData[n]!['reason'] = '타교회'; else if (l == '결석') { _attendanceData[n]!['reason'] = '연락x'; _customReasonControllers[n]?.clear(); } }); }, 
       child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: s ? c : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(l, style: TextStyle(color: s ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 11)))
     ); 
   }
 
-  Future<void> _selectDate() async { 
-    final DateTime? picked = await showDatePicker(context: context, initialDate: _targetDate, firstDate: DateTime(2025, 1, 1), lastDate: DateTime.now(), locale: const Locale('ko', 'KR'), selectableDayPredicate: (day) => day.weekday == DateTime.sunday); 
-    if (picked != null && mounted) { 
-      setState(() { _targetDate = picked; _loadData(); }); 
-    } 
-  }
+  Future<void> _selectDate() async { final DateTime? picked = await showDatePicker(context: context, initialDate: _targetDate, firstDate: DateTime(2025, 1, 1), lastDate: DateTime.now(), locale: const Locale('ko', 'KR'), selectableDayPredicate: (day) => day.weekday == DateTime.sunday); if (picked != null && mounted) setState(() { _targetDate = picked; _loadData(); }); }
 
   @override 
-  void dispose() { 
-    for (var controller in _customReasonControllers.values) {
-      controller.dispose();
-    }
-    super.dispose(); 
-  }
+  void dispose() { for (var controller in _customReasonControllers.values) controller.dispose(); super.dispose(); }
 }
