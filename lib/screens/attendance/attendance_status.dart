@@ -12,7 +12,6 @@ class AttendanceStatusScreen extends StatefulWidget {
 
 class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   final ScrollController _scrollController = ScrollController();
-  // ✅ 출석률 추이 그래프 전용 스크롤 컨트롤러 추가
   final ScrollController _trendScrollController = ScrollController();
   
   DateTime _selectedDate = _getRecentSunday();
@@ -52,7 +51,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _trendScrollController.dispose(); // ✅ 컨트롤러 해제
+    _trendScrollController.dispose();
     super.dispose();
   }
 
@@ -66,7 +65,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     }
   }
 
-  // ✅ 그래프를 최신 데이터(오른쪽 끝)로 이동시키는 함수
   void _scrollToLatestTrend() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_trendScrollController.hasClients) {
@@ -208,7 +206,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
 
         if (isActuallyTeacher) {
           baseStats['교사']!['records'][n] = {...infoMap, 'role': '교사', 'cell': '교사'};
-          if (infoMap['status'] == '출석') tP++;
+          if (infoMap['status'] == '출석' || infoMap['status'] == '인정') tP++;
         } else {
           final String cellId = doc.id.split('셀')[0];
           if (!baseStats.containsKey(cellId)) baseStats[cellId] = {'id': cellId, 'total': 0, 'present': 0, 'records': <String, dynamic>{}};
@@ -242,7 +240,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
         
         indv[n] = {...infoMap, 'name': name, 'cell': displayCell, 'role': role};
 
-        if (infoMap['status'] == '출석') {
+        if (infoMap['status'] == '출석' || infoMap['status'] == '인정') {
           presentInCell++;
           if (role != '교사') {
             sP++;
@@ -260,7 +258,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
           if (_genderStats.containsKey(sex)) _genderStats[sex]!['t'] = (_genderStats[sex]!['t'] ?? 0) + 1;
         }
 
-        if (infoMap['status'] != '출석' && group == 'A' && role != '교사') {
+        if (infoMap['status'] != '출석' && infoMap['status'] != '인정' && group == 'A' && role != '교사') {
           _absenceReasonCounts[infoMap['reason'] ?? '연락x'] = (_absenceReasonCounts[infoMap['reason'] ?? '연락x'] ?? 0) + 1;
         }
       });
@@ -313,7 +311,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       records.forEach((name, info) {
         final String n = _normalizeName(name);
         final infoMap = Map<String, dynamic>.from(info);
-        final bool isP = infoMap['status'] == '출석';
+        final bool isP = infoMap['status'] == '출석' || infoMap['status'] == '인정';
         
         bool isActuallyTeacher = teacherNames.contains(n) || doc.id.startsWith('teachers');
         final String role = isActuallyTeacher ? '교사' : (infoMap['role'] ?? master[n]?['role'] ?? '학생');
@@ -394,7 +392,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       _teacherPresent = _summaryList.isEmpty ? 0 : (_summaryList.map((e) => e['tP'] as int).reduce((a, b) => a + b) / _summaryList.length).round();
     });
 
-    // ✅ 데이터 처리가 끝나면 그래프를 최신순으로 스크롤
     _scrollToLatestTrend();
   }
 
@@ -619,7 +616,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.withValues(alpha: 0.05))),
         child: tot == 0 ? const Center(child: Text("데이터 없음", style: TextStyle(fontSize: 13, color: Colors.grey))) : Column(children: top5.asMap().entries.map((e) {
           final double p = e.value.value / tot;
-          return Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [
+          return Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
             SizedBox(width: 20, child: Text("${e.key + 1}", style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.redAccent))),
             Expanded(child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(e.value.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), Text("${e.value.value}명", style: const TextStyle(fontSize: 12, color: Colors.blueGrey))]),
@@ -639,7 +636,6 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('출석률 추이', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.blue)),
         const SizedBox(height: 16),
-        // ✅ [수정] 가로 스크롤 적용 및 최신순 노출
         SingleChildScrollView(
           controller: _trendScrollController,
           scrollDirection: Axis.horizontal,
@@ -649,7 +645,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
             children: sortedTrend.map((i) {
               final double r = (i['sP'] ?? 0) > 0 ? (i['sP'] / (i['sT'] ?? 1)) : 0;
               return Container(
-                width: 50, // ✅ 각 항목당 고정 너비 지정 (10개가 한 화면에 보이기 좋은 수치)
+                width: 50, 
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end, 
@@ -718,7 +714,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
               mainAxisSize: MainAxisSize.min, 
               children: [
                 SizedBox(width: 30, child: Text('${i + 1}', style: TextStyle(fontSize: 12, color: Colors.grey.shade400))), 
-                CircleAvatar(radius: 16, child: Text(m['name'][0], style: const TextStyle(fontSize: 14)))
+                CircleAvatar(radius: 16, child: Text(m['name'][0], style: const TextStyle(fontSize: 12)))
               ]
             ), 
             title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), 
@@ -766,71 +762,63 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
+  // ✅ [수정] '출석'과 '인정' 상태에 따른 색상 구분 처리
+  // Error 해결: themeColor를 MaterialColor로 변경
   Widget _buildMemberGrid(Map<String, dynamic> r, bool isT) {
     final entries = r.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
-    if (isT) {
-      return Wrap(spacing: 8, runSpacing: 8, children: entries.map((i) {
-        final bool isP = i.value['status'] == '출석'; 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
-          decoration: BoxDecoration(
-            color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, 
-            borderRadius: BorderRadius.circular(6)
-          ), 
-          child: Text(
-            i.key, 
-            style: TextStyle(
-              fontSize: 16, 
-              color: isP ? Colors.orange.shade800 : Colors.grey.shade400, 
-              fontWeight: isP ? FontWeight.bold : FontWeight.normal
-            )
+    
+    Widget buildChip(String name, String status, MaterialColor themeColor) {
+      Color bgColor;
+      Color textColor;
+      if (status == '출석') {
+        bgColor = themeColor.withValues(alpha: 0.05);
+        textColor = themeColor.shade800; // ✅ 이제 에러가 발생하지 않습니다.
+      } else if (status == '인정') {
+        // ✅ 인정 상태는 무조건 파란색(Blue)으로 표시
+        bgColor = Colors.blue.withValues(alpha: 0.05);
+        textColor = Colors.blue.shade800;
+      } else {
+        bgColor = Colors.grey.shade100;
+        textColor = Colors.grey.shade400;
+      }
+      
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(6)),
+        child: Text(
+          name, 
+          style: TextStyle(
+            fontSize: 16, 
+            color: textColor, 
+            fontWeight: (status == '출석' || status == '인정') ? FontWeight.bold : FontWeight.normal
           )
-        );
-      }).toList());
+        ),
+      );
     }
+
+    if (isT) {
+      return Wrap(
+        spacing: 8, runSpacing: 8, 
+        children: entries.map((i) => buildChip(i.key, i.value['status'] ?? '결석', Colors.orange)).toList(),
+      );
+    }
+    
     final gA = entries.where((i) => (i.value['group'] ?? 'A') == 'A').toList();
     final gB = entries.where((i) => (i.value['group'] ?? 'A') == 'B').toList();
+    
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (gA.isNotEmpty) Wrap(spacing: 8, runSpacing: 8, children: gA.map((i) {
-        final bool isP = i.value['status'] == '출석'; 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
-          decoration: BoxDecoration(
-            color: isP ? Colors.teal.withValues(alpha: 0.05) : Colors.grey.shade100, 
-            borderRadius: BorderRadius.circular(6)
-          ), 
-          child: Text(
-            i.key, 
-            style: TextStyle(
-              fontSize: 16, 
-              color: isP ? Colors.teal.shade800 : Colors.grey.shade400, 
-              fontWeight: isP ? FontWeight.bold : FontWeight.normal
-            )
-          )
-        );
-      }).toList()),
+      if (gA.isNotEmpty) Wrap(
+        spacing: 8, runSpacing: 8, 
+        children: gA.map((i) => buildChip(i.key, i.value['status'] ?? '결석', Colors.teal)).toList(),
+      ),
       if (gB.isNotEmpty) ...[
         const SizedBox(height: 16), 
         const Text("특별 관리(B)", style: TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.bold)), 
         const SizedBox(height: 8), 
-        Wrap(spacing: 8, runSpacing: 8, children: gB.map((i) {
-          final bool isP = i.value['status'] == '출석';
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), 
-            decoration: BoxDecoration(
-              color: isP ? Colors.orange.withValues(alpha: 0.05) : Colors.grey.shade100, 
-              borderRadius: BorderRadius.circular(6)
-            ), 
-            child: Text(
-              i.key, 
-              style: TextStyle(
-                fontSize: 16, 
-                color: isP ? Colors.orange.shade800 : Colors.grey.shade400, 
-                fontWeight: isP ? FontWeight.bold : FontWeight.normal
-              )
-            )
-          );
-        }).toList())
+        Wrap(
+          spacing: 8, runSpacing: 8, 
+          children: gB.map((i) => buildChip(i.key, i.value['status'] ?? '결석', Colors.orange)).toList(),
+        )
       ],
     ]);
   }
