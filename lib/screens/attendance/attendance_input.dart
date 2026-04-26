@@ -397,7 +397,7 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
 
   Widget _miniButton(String n, String l, bool s, Color c) { 
     return GestureDetector(
-      onTap: () { if (mounted) setState(() { _attendanceData[n]!['status'] = l; if (l == '인정') _attendanceData[n]!['reason'] = '타교회'; else if (l == '결석') { _attendanceData[n]!['reason'] = '연락x'; _customReasonControllers[n]?.clear(); } }); }, 
+      onTap: () { if (mounted) setState(() { _attendanceData[n]!['status'] = l; if (l == '인정'){ _attendanceData[n]!['reason'] = '타교회'; }else if (l == '결석') { _attendanceData[n]!['reason'] = '연락x'; _customReasonControllers[n]?.clear(); } }); }, 
       child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: s ? c : Colors.grey.shade100, borderRadius: BorderRadius.circular(6)), child: Text(l, style: TextStyle(color: s ? Colors.white : Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 11)))
     ); 
   }
@@ -405,5 +405,12 @@ class _AttendanceInputScreenState extends State<AttendanceInputScreen> {
   Future<void> _selectDate() async { final DateTime? picked = await showDatePicker(context: context, initialDate: _targetDate, firstDate: DateTime(2025, 1, 1), lastDate: DateTime.now(), locale: const Locale('ko', 'KR'), selectableDayPredicate: (day) => day.weekday == DateTime.sunday); if (picked != null && mounted) setState(() { _targetDate = picked; _loadData(); }); }
 
   @override 
-  void dispose() { for (var controller in _customReasonControllers.values) controller.dispose(); super.dispose(); }
+  void dispose() {
+  // for 문 뒤에 중괄호를 추가하여 코드 블록을 명확히 합니다.
+  for (var controller in _customReasonControllers.values) {
+    controller.dispose();
+  }
+  
+  super.dispose();
+}
 }
