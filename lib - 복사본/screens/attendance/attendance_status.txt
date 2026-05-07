@@ -762,8 +762,7 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
     );
   }
 
-  // ✅ [수정] '출석'과 '인정' 상태에 따른 색상 구분 처리
-  // Error 해결: themeColor를 MaterialColor로 변경
+  // ✅ [수정] 출석인정 상태의 색상을 눈에 띄는 'Indigo'로 변경했습니다.
   Widget _buildMemberGrid(Map<String, dynamic> r, bool isT) {
     final entries = r.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
     
@@ -772,11 +771,11 @@ class _AttendanceStatusScreenState extends State<AttendanceStatusScreen> {
       Color textColor;
       if (status == '출석') {
         bgColor = themeColor.withValues(alpha: 0.05);
-        textColor = themeColor.shade800; // ✅ 이제 에러가 발생하지 않습니다.
+        textColor = themeColor.shade800;
       } else if (status == '인정') {
-        // ✅ 인정 상태는 무조건 파란색(Blue)으로 표시
-        bgColor = Colors.blue.withValues(alpha: 0.05);
-        textColor = Colors.blue.shade800;
+        // ✅ [변경] 인정 상태는 인디고(Indigo) 색상으로 명확하게 구분
+        bgColor = Colors.indigo.withValues(alpha: 0.08);
+        textColor = Colors.indigo.shade900;
       } else {
         bgColor = Colors.grey.shade100;
         textColor = Colors.grey.shade400;

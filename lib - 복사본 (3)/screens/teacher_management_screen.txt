@@ -25,7 +25,7 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('departments').doc('중등부').collection('teachers').snapshots(),
+        stream: FirebaseFirestore.instance.collection('teachers').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -248,7 +248,7 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
             onPressed: () async {
               try {
                 await FirebaseFirestore.instance
-                    .collection('departments').doc('중등부').collection('teachers')
+                    .collection('teachers')
                     .doc(docId)
                     .update({'isFirstLogin': true});
                 

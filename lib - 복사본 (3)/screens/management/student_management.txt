@@ -77,10 +77,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
   Future<void> _loadInitialData() async {
     try {
       final sSnap = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부').collection('students')
+          .collection('students')
           .get();
       final tSnap = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부').collection('teachers')
+          .collection('teachers')
           .get();
 
       if (!mounted) return;
@@ -196,7 +196,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
     if (confirm == true) {
       try {
         await FirebaseFirestore.instance
-            .collection('departments').doc('중등부').collection('students')
+            .collection('students')
             .doc(s['docId'])
             .update({
               'group': 'A',
@@ -1385,7 +1385,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen> {
                 onPressed: () async {
                   try {
                     await FirebaseFirestore.instance
-                        .collection('departments').doc('중등부').collection('students')
+                        .collection('students')
                         .doc(s['docId'])
                         .update({
                           'name': nameController.text.trim(),

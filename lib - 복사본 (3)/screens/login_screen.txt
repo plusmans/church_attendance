@@ -47,7 +47,7 @@ class AuthGate extends StatelessWidget {
         // 3. 로그인되었을 때 -> 유저 정보 확인 (비밀번호 변경 대상인지 체크)
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance
-              .collection('departments').doc('중등부').collection('teachers')
+              .collection('teachers')
               .doc(snapshot.data!.uid)
               .get(),
           builder: (context, teacherSnap) {

@@ -71,7 +71,7 @@ class StudentService {
     };
 
     // 4. Firestore에 문서 생성 (ID 직접 지정)
-    await _db.collection('departments').doc('중등부').collection('students').doc(finalDocId).set(studentData);
+    await _db.collection('students').doc(finalDocId).set(studentData);
 
     return {
       "docId": finalDocId,
@@ -89,7 +89,7 @@ class StudentService {
     String baseId = "$cell셀_${grade}_$name";
     
     // 첫 번째 시도: 기본 ID 확인
-    var doc = await _db.collection('departments').doc('중등부').collection('students').doc(baseId).get();
+    var doc = await _db.collection('students').doc(baseId).get();
     if (!doc.exists) {
       return {"docId": baseId, "name": name};
     }
@@ -101,7 +101,7 @@ class StudentService {
       // [수정] 불필요한 중괄호 제거 (Lint: unnecessary_brace_in_string_interps)
       String candidateId = "$cell셀_${grade}_$candidateName";
       
-      var checkDoc = await _db.collection('departments').doc('중등부').collection('students').doc(candidateId).get();
+      var checkDoc = await _db.collection('students').doc(candidateId).get();
       if (!checkDoc.exists) {
         return {"docId": candidateId, "name": candidateName};
       }

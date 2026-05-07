@@ -104,7 +104,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _loadMyPrayer() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('prayer_requests')
           .doc('${_currentMonth}_${widget.teacherName}')
           .get();
@@ -133,7 +136,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _loadCommonPrayer() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('common_prayers')
           .doc(_currentMonth)
           .get();
@@ -197,7 +203,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('prayer_requests')
           .doc('${_currentMonth}_${widget.teacherName}')
           .set({
@@ -227,7 +236,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isCommonSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('common_prayers')
           .doc(_currentMonth)
           .set({
@@ -257,7 +269,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isUrgentSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('urgent_prayers')
           .add({
             'month': _currentMonth,
@@ -283,7 +298,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _deleteUrgentPrayer(String docId) async {
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('urgent_prayers')
           .doc(docId)
           .delete();
@@ -303,12 +321,18 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final fontBold = await PdfGoogleFonts.notoSansKRBold();
 
     final prayerSnapshot = await FirebaseFirestore.instance
-        .collection('departments').doc('중등부')
+        .collection('artifacts')
+        .doc(appId)
+        .collection('public')
+        .doc('data')
         .collection('prayer_requests')
         .get();
 
     final urgentSnapshot = await FirebaseFirestore.instance
-        .collection('departments').doc('중등부')
+        .collection('artifacts')
+        .doc(appId)
+        .collection('public')
+        .doc('data')
         .collection('urgent_prayers')
         .get();
 
@@ -647,7 +671,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildUrgentStreamArea() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('urgent_prayers')
           .snapshots(),
       builder: (context, snapshot) {
@@ -1006,7 +1033,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildTotalStreamList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('artifacts')
+          .doc(appId)
+          .collection('public')
+          .doc('data')
           .collection('prayer_requests')
           .snapshots(),
       builder: (context, snapshot) {

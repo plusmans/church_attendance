@@ -66,7 +66,7 @@ class MyApp extends StatelessWidget {
 
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('departments').doc('중등부').collection('teachers')
+                  .collection('teachers')
                   .where('phone', isEqualTo: phoneNumber)
                   .snapshots(),
               builder: (context, teacherSnapshot) {
@@ -153,7 +153,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (widget.isMandatory) {
         await FirebaseFirestore.instance
-            .collection('departments').doc('중등부').collection('teachers')
+            .collection('teachers')
             .doc(widget.docId)
             .update({'isFirstLogin': false});
       }

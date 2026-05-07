@@ -42,8 +42,8 @@ class _StudentMigrationScreenState extends State<StudentMigrationScreen> {
 
     try {
       final db = FirebaseFirestore.instance;
-      final studentRef = db.collection('departments').doc('중등부').collection('students');
-      final attendanceRef = db.collection('departments').doc('중등부').collection('attendance');
+      final studentRef = db.collection('students');
+      final attendanceRef = db.collection('attendance');
 
       DocumentSnapshot studentDoc = await studentRef.doc(oldIdInput).get();
       if (!studentDoc.exists) {
