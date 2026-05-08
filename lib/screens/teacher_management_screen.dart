@@ -54,6 +54,8 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
               var teacher = teachers[index];
               var data = teacher.data() as Map<String, dynamic>;
               bool isFirstLogin = data['isFirstLogin'] ?? false;
+              // ✅ [해결방법] DB에서 fcmToken 값을 꺼내서 변수에 담아주는 이 줄이 반드시 있어야 합니다!
+              String? fcmToken = data['fcmToken'];
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -142,6 +144,8 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
                             const SizedBox(height: 8),
                             // 상태 배지
                             _buildStatusBadge(isFirstLogin),
+                            const SizedBox(width: 8), // 간격 추가
+                            _buildFcmBadge(fcmToken), // ✅ 새로 추가한 알림 상태 배지
                           ],
                         ),
                       ),
@@ -183,6 +187,39 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
             },
           );
         },
+      ),
+    );
+  }
+
+  // ✅ 선생님별 알림 상태(fcmToken 유무)를 보여주는 배지 위젯
+  Widget _buildFcmBadge(String? fcmToken) {
+    bool isConnected =
+        fcmToken != null && fcmToken.toString().trim().isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isConnected ? Colors.blue.shade50 : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isConnected ? Icons.notifications_active : Icons.notifications_off,
+            size: 12,
+            color: isConnected ? Colors.blue.shade700 : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isConnected ? '알림 수신 중' : '알림 미연결',
+            style: TextStyle(
+              color: isConnected ? Colors.blue.shade700 : Colors.grey.shade600,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -262,7 +262,21 @@ class _HomeNavigationState extends State<HomeNavigation> {
               );
             },
           ),
+          // ✅ 1. 추가된 수동 알림 권한 갱신 버튼 (경고 해결 버전)
+          IconButton(
+            icon: const Icon(Icons.notification_add, color: Colors.amber),
+            tooltip: '알림 수신 설정 갱신',
+            onPressed: () async {
+              await _updateTeacherToken(); // initState에 있던 토큰 갱신 함수 수동 호출
 
+              // 💡 mounted 대신 context.mounted를 사용하여 비동기 갭(Async gap) 경고 해결
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('🔔 알림 수신 설정이 갱신되었습니다.')),
+                );
+              }
+            },
+          ),
           IconButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             constraints: const BoxConstraints(),
