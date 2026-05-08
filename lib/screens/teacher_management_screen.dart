@@ -25,7 +25,11 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('departments').doc('중등부').collection('teachers').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('departments')
+            .doc('중등부')
+            .collection('teachers')
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -248,13 +252,15 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
             onPressed: () async {
               try {
                 await FirebaseFirestore.instance
-                    .collection('departments').doc('중등부').collection('teachers')
+                    .collection('departments')
+                    .doc('중등부')
+                    .collection('teachers')
                     .doc(docId)
                     .update({'isFirstLogin': true});
-                
+
                 // ✅ 비동기 작업(await) 직후에 mounted 상태를 확인하여 context 안전성 확보
                 if (!mounted) return;
-                
+
                 // 미리 참조해둔 navigator와 messenger를 사용하여 경고 해결
                 navigator.pop();
                 messenger.showSnackBar(
@@ -268,9 +274,7 @@ class _TeacherManagementScreenState extends State<TeacherManagementScreen> {
                 );
               } catch (e) {
                 if (!mounted) return;
-                messenger.showSnackBar(
-                  SnackBar(content: Text('오류 발생: $e')),
-                );
+                messenger.showSnackBar(SnackBar(content: Text('오류 발생: $e')));
               }
             },
             style: ElevatedButton.styleFrom(

@@ -1,12 +1,15 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'attendance/attendance_status.dart';
 import 'attendance/attendance_input.dart';
 import 'management/student_management.dart';
 import 'prayer/prayer_screen.dart';
 import 'change_password_screen.dart';
 import 'teacher_management_screen.dart';
+// ✅ 알림 토큰 발급을 위한 패키지 추가
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class HomeNavigation extends StatefulWidget {
   final String teacherName;
@@ -48,6 +51,43 @@ class _HomeNavigationState extends State<HomeNavigation> {
     super.initState();
     _cheerMessage = _cheerMessages[Random().nextInt(_cheerMessages.length)];
     _buildScreens();
+
+    // ✅ 앱 실행(로그인) 시 교사 실제 기기 토큰 수집 및 업데이트
+    _updateTeacherToken();
+  }
+
+  // ✅ 선생님 FCM 토큰 수집 로직 (알림 발송은 안 함, 주소록만 저장)
+  Future<void> _updateTeacherToken() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+      // 1. 사용자에게 알림 권한 팝업 띄우기 (최초 1회)
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // 2. 알림을 허용했다면 기기 고유 토큰(fcmToken) 발급
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        String? token = await messaging.getToken();
+
+        if (token != null) {
+          // 3. 앞서 변경한 '중등부' 전용 경로의 선생님 문서에 토큰값만 병합 업데이트
+          await FirebaseFirestore.instance
+              .collection('departments')
+              .doc('중등부')
+              .collection('teachers')
+              .doc(widget.docId) // 현재 로그인한 선생님의 고유 문서 ID
+              .update({
+                'fcmToken': token, // 앞서 일괄 생성한 빈칸을 실제 토큰으로 채움
+              });
+          debugPrint("✅ 실제 FCM 토큰 업데이트 완료");
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ 토큰 업데이트 실패: $e");
+    }
   }
 
   void _buildScreens() {
@@ -91,10 +131,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
           '로그아웃',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        content: const Text(
-          '정말 로그아웃 하시겠습니까?',
-          style: TextStyle(fontSize: 14),
-        ),
+        content: const Text('정말 로그아웃 하시겠습니까?', style: TextStyle(fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -171,7 +208,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
               appBarTitle,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 19, 
+                fontSize: 19,
                 letterSpacing: -0.5,
               ),
             ),
@@ -187,12 +224,18 @@ class _HomeNavigationState extends State<HomeNavigation> {
             IconButton(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               constraints: const BoxConstraints(),
-              icon: const Icon(Icons.people_alt_rounded, size: 22, color: Colors.white70),
+              icon: const Icon(
+                Icons.people_alt_rounded,
+                size: 22,
+                color: Colors.white70,
+              ),
               tooltip: '교사 관리',
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const TeacherManagementScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const TeacherManagementScreen(),
+                  ),
                 );
               },
             ),
@@ -200,7 +243,11 @@ class _HomeNavigationState extends State<HomeNavigation> {
           IconButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             constraints: const BoxConstraints(),
-            icon: const Icon(Icons.lock_reset_rounded, size: 22, color: Colors.white70),
+            icon: const Icon(
+              Icons.lock_reset_rounded,
+              size: 22,
+              color: Colors.white70,
+            ),
             tooltip: '비밀번호 변경',
             onPressed: () {
               Navigator.push(
@@ -219,7 +266,11 @@ class _HomeNavigationState extends State<HomeNavigation> {
           IconButton(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             constraints: const BoxConstraints(),
-            icon: const Icon(Icons.logout_rounded, size: 22, color: Colors.white70),
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 22,
+              color: Colors.white70,
+            ),
             tooltip: '로그아웃',
             onPressed: () => _showLogoutDialog(context),
           ),
@@ -235,18 +286,28 @@ class _HomeNavigationState extends State<HomeNavigation> {
               children: [
                 Text(
                   '${widget.teacherName} ${isSuperAdmin ? '사역자' : '교사'}',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 3,
+                    vertical: 0,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Text(
                     displayRole,
-                    style: const TextStyle(fontSize: 7, color: Colors.white, fontWeight: FontWeight.w400),
+                    style: const TextStyle(
+                      fontSize: 7,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ),
               ],
@@ -258,7 +319,9 @@ class _HomeNavigationState extends State<HomeNavigation> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey.shade200, width: 0.5)),
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade200, width: 0.5),
+          ),
         ),
         child: SafeArea(
           child: SizedBox(
@@ -276,27 +339,49 @@ class _HomeNavigationState extends State<HomeNavigation> {
               },
               selectedItemColor: themeColor,
               unselectedItemColor: Colors.grey.shade400,
-              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+              selectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
+              ),
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.white,
               elevation: 0,
               iconSize: 22,
               items: [
                 BottomNavigationBarItem(
-                  icon: Icon(_selectedIndex == 0 ? Icons.bar_chart_rounded : Icons.bar_chart_outlined),
+                  icon: Icon(
+                    _selectedIndex == 0
+                        ? Icons.bar_chart_rounded
+                        : Icons.bar_chart_outlined,
+                  ),
                   label: '현황',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(_selectedIndex == 1 ? Icons.edit_calendar_rounded : Icons.edit_calendar_outlined),
+                  icon: Icon(
+                    _selectedIndex == 1
+                        ? Icons.edit_calendar_rounded
+                        : Icons.edit_calendar_outlined,
+                  ),
                   label: '출석',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(_selectedIndex == 2 ? Icons.manage_accounts_rounded : Icons.manage_accounts_outlined),
+                  icon: Icon(
+                    _selectedIndex == 2
+                        ? Icons.manage_accounts_rounded
+                        : Icons.manage_accounts_outlined,
+                  ),
                   label: '관리',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(_selectedIndex == 3 ? Icons.volunteer_activism : Icons.volunteer_activism_outlined),
+                  icon: Icon(
+                    _selectedIndex == 3
+                        ? Icons.volunteer_activism
+                        : Icons.volunteer_activism_outlined,
+                  ),
                   label: '기도',
                 ),
               ],
