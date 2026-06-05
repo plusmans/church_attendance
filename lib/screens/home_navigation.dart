@@ -54,6 +54,60 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
     // ✅ 앱 실행(로그인) 시 교사 실제 기기 토큰 수집 및 업데이트
     _updateTeacherToken();
+    // ✅ 푸시 알림 관련 설정 초기화
+    _setupPushNotifications();
+  }
+
+  // ✅ 푸시 알림 관련 설정
+  void _setupPushNotifications() {
+    // 1. 앱이 실행 중(Foreground)일 때 푸시 알림 수신 처리
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('📳 포그라운드 메시지 수신: ${message.notification?.title}');
+      if (message.notification != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🚨 ${message.notification!.title}\n${message.notification!.body}',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    });
+
+    // 2. 알림을 탭하여 앱에 진입했을 때(앱이 백그라운드에 있을 때) 처리
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('알림 탭(백그라운드): ${message.data}');
+      _handleNotificationNavigation(message.data);
+    });
+
+    // 3. 앱이 종료된 상태에서 알림을 탭하여 실행되었을 때 처리
+    FirebaseMessaging.instance.getInitialMessage().then((
+      RemoteMessage? message,
+    ) {
+      if (message != null) {
+        debugPrint('알림 탭(종료): ${message.data}');
+        // 위젯 빌드가 완료된 후에 상태를 변경하기 위해 약간의 지연을 줌
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _handleNotificationNavigation(message.data);
+        });
+      }
+    });
+
+    // 4. FCM 기기 토큰이 시스템에 의해 갱신(Refresh)될 때 자동 업데이트 처리
+    FirebaseMessaging.instance.onTokenRefresh
+        .listen((String newToken) async {
+          debugPrint('🔄 FCM 토큰 자동 갱신됨: $newToken');
+          await FirebaseFirestore.instance
+              .collection('departments')
+              .doc('중등부')
+              .collection('teachers')
+              .doc(widget.docId)
+              .update({'fcmToken': newToken});
+        })
+        .onError((err) {
+          debugPrint('❌ 토큰 갱신 리스너 오류: $err');
+        });
   }
 
   // ✅ 선생님 FCM 토큰 수집 로직 (알림 발송은 안 함, 주소록만 저장)
@@ -87,6 +141,16 @@ class _HomeNavigationState extends State<HomeNavigation> {
       }
     } catch (e) {
       debugPrint("❌ 토큰 업데이트 실패: $e");
+    }
+  }
+
+  // ✅ 알림 데이터에 따라 화면 이동 처리
+  void _handleNotificationNavigation(Map<String, dynamic> data) {
+    // 'screen' 데이터가 'prayer_screen'이면 기도 페이지로 이동
+    if (data['screen'] == 'prayer_screen') {
+      setState(() {
+        _selectedIndex = 3; // 기도 화면의 인덱스 (0:현황, 1:출석, 2:관리, 3:기도)
+      });
     }
   }
 
@@ -139,6 +203,18 @@ class _HomeNavigationState extends State<HomeNavigation> {
           ),
           TextButton(
             onPressed: () async {
+              // ✅ 로그아웃 시 해당 교사의 FCM 토큰을 DB에서 삭제 (알림 오발송 방지)
+              try {
+                await FirebaseFirestore.instance
+                    .collection('departments')
+                    .doc('중등부')
+                    .collection('teachers')
+                    .doc(widget.docId)
+                    .update({'fcmToken': FieldValue.delete()});
+              } catch (e) {
+                debugPrint('로그아웃 시 토큰 삭제 실패: $e');
+              }
+
               await FirebaseAuth.instance.signOut();
               if (context.mounted) Navigator.pop(context);
             },

@@ -5,19 +5,33 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 // 폰트 적용을 위한 패키지 임포트
 import 'package:google_fonts/google_fonts.dart';
+// ✅ 푸시 알림 처리를 위한 패키지 추가
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 // 실제 프로젝트의 파일 경로입니다. 파일명이 다르면 수정해주세요.
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_navigation.dart';
 
+// ✅ 앱이 백그라운드나 종료된 상태에서 푸시 알림을 받았을 때 실행되는 핸들러
+// 이 함수는 최상위 레벨에 위치해야 합니다. (클래스 밖)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint("📳 백그라운드 메시지 수신: ${message.notification?.title}");
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 💡 웹 환경에서 폰트 렌더링 문제를 방지하기 위해 런타임 페칭 허용 설정
   GoogleFonts.config.allowRuntimeFetching = true;
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ✅ 백그라운드 메시지 핸들러 등록
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   runApp(const MyApp());
 }
 
@@ -37,21 +51,21 @@ class MyApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('ko', 'KR')],
       locale: const Locale('ko', 'KR'),
-      
+
       // 💡 앱 전체 테마 설정 (copyWith 대신 생성자에서 직접 설정)
       theme: ThemeData(
         primarySwatch: Colors.teal,
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        
+
         // 1. 전역 폰트 패밀리 지정 (ThemeData 생성자에서 직접 설정)
         fontFamily: GoogleFonts.notoSansKr().fontFamily,
-        
+
         // 2. 모든 텍스트 테마에 Noto Sans KR 적용
         textTheme: GoogleFonts.notoSansKrTextTheme(),
         primaryTextTheme: GoogleFonts.notoSansKrTextTheme(),
       ),
-      
+
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, authSnapshot) {
@@ -66,17 +80,21 @@ class MyApp extends StatelessWidget {
 
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('departments').doc('중등부').collection('teachers')
+                  .collection('departments')
+                  .doc('중등부')
+                  .collection('teachers')
                   .where('phone', isEqualTo: phoneNumber)
                   .snapshots(),
               builder: (context, teacherSnapshot) {
-                if (teacherSnapshot.connectionState == ConnectionState.waiting) {
+                if (teacherSnapshot.connectionState ==
+                    ConnectionState.waiting) {
                   return const Scaffold(
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
 
-                if (teacherSnapshot.hasData && teacherSnapshot.data!.docs.isNotEmpty) {
+                if (teacherSnapshot.hasData &&
+                    teacherSnapshot.data!.docs.isNotEmpty) {
                   var doc = teacherSnapshot.data!.docs.first;
                   var data = doc.data() as Map<String, dynamic>;
 
@@ -153,7 +171,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (widget.isMandatory) {
         await FirebaseFirestore.instance
-            .collection('departments').doc('중등부').collection('teachers')
+            .collection('departments')
+            .doc('중등부')
+            .collection('teachers')
             .doc(widget.docId)
             .update({'isFirstLogin': false});
       }
@@ -185,16 +205,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             const SizedBox(height: 24),
             const Text('안전한 이용을 위해 비밀번호를 변경해주세요.', textAlign: TextAlign.center),
             const SizedBox(height: 40),
-            TextField(controller: _oldPwController, obscureText: true, decoration: const InputDecoration(labelText: '현재 비밀번호')),
-            TextField(controller: _pwController, obscureText: true, decoration: const InputDecoration(labelText: '새 비밀번호')),
-            TextField(controller: _confirmController, obscureText: true, decoration: const InputDecoration(labelText: '새 비밀번호 확인')),
+            TextField(
+              controller: _oldPwController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '현재 비밀번호'),
+            ),
+            TextField(
+              controller: _pwController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '새 비밀번호'),
+            ),
+            TextField(
+              controller: _confirmController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: '새 비밀번호 확인'),
+            ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _updatePassword,
-                child: _isLoading ? const CircularProgressIndicator() : const Text('변경 완료'),
+                child: _isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text('변경 완료'),
               ),
             ),
           ],
@@ -218,7 +252,10 @@ class _ErrorScreen extends StatelessWidget {
             const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
             const SizedBox(height: 16),
             Text('사용자($phoneNumber) 정보를 찾을 수 없습니다.'),
-            TextButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text('로그아웃')),
+            TextButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text('로그아웃'),
+            ),
           ],
         ),
       ),
