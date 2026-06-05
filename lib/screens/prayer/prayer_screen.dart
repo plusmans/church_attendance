@@ -104,7 +104,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _loadMyPrayer() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('prayer_requests')
           .doc('${_currentMonth}_${widget.teacherName}')
           .get();
@@ -122,6 +123,48 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 : [TextEditingController()];
           });
         } else {
+          // ✅ 현재 달의 데이터가 없으면, 과거의 가장 최근 기도제목을 불러와서 채워줍니다.
+          final pastQuery = await FirebaseFirestore.instance
+              .collection('departments')
+              .doc('중등부')
+              .collection('prayer_requests')
+              .where('teacherName', isEqualTo: _cleanName(widget.teacherName))
+              .get();
+
+          if (pastQuery.docs.isNotEmpty) {
+            // 현재 달(_currentMonth)보다 이전 달의 데이터만 필터링
+            final pastDocs = pastQuery.docs.where((d) {
+              final month = d.data().containsKey('month')
+                  ? d.get('month') as String
+                  : '';
+              return month.isNotEmpty && month.compareTo(_currentMonth) < 0;
+            }).toList();
+
+            if (pastDocs.isNotEmpty) {
+              // 최신 달 순서로 정렬 (내림차순)
+              pastDocs.sort(
+                (a, b) => (b.get('month') as String).compareTo(
+                  a.get('month') as String,
+                ),
+              );
+
+              final List<dynamic> recentContent =
+                  pastDocs.first.get('content') ?? [];
+              setState(() {
+                _controllers = recentContent.isNotEmpty
+                    ? recentContent
+                          .map(
+                            (text) =>
+                                TextEditingController(text: text.toString()),
+                          )
+                          .toList()
+                    : [TextEditingController()];
+              });
+              return;
+            }
+          }
+
+          // 과거 데이터도 전혀 없다면 빈 칸 1개 표시
           setState(() => _controllers = [TextEditingController()]);
         }
       }
@@ -133,7 +176,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _loadCommonPrayer() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('common_prayers')
           .doc(_currentMonth)
           .get();
@@ -151,6 +195,47 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 : [TextEditingController(text: '내용을 입력해주세요.')];
           });
         } else {
+          // ✅ 현재 달의 데이터가 없으면, 과거의 가장 최근 공동 기도제목을 불러와서 채워줍니다.
+          final pastQuery = await FirebaseFirestore.instance
+              .collection('departments')
+              .doc('중등부')
+              .collection('common_prayers')
+              .get();
+
+          if (pastQuery.docs.isNotEmpty) {
+            // 현재 달(_currentMonth)보다 이전 달의 데이터만 필터링
+            final pastDocs = pastQuery.docs.where((d) {
+              final month = d.data().containsKey('month')
+                  ? d.get('month') as String
+                  : '';
+              return month.isNotEmpty && month.compareTo(_currentMonth) < 0;
+            }).toList();
+
+            if (pastDocs.isNotEmpty) {
+              // 최신 달 순서로 정렬 (내림차순)
+              pastDocs.sort(
+                (a, b) => (b.get('month') as String).compareTo(
+                  a.get('month') as String,
+                ),
+              );
+
+              final List<dynamic> recentTopics =
+                  pastDocs.first.get('topics') ?? [];
+              setState(() {
+                _commonControllers = recentTopics.isNotEmpty
+                    ? recentTopics
+                          .map(
+                            (text) =>
+                                TextEditingController(text: text.toString()),
+                          )
+                          .toList()
+                    : [TextEditingController(text: '내용을 입력해주세요.')];
+              });
+              return;
+            }
+          }
+
+          // 과거 데이터도 전혀 없다면 기본 문구 표시
           setState(() {
             _commonControllers = [
               TextEditingController(text: '말씀으로 바로 서는 중등부'),
@@ -197,7 +282,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('prayer_requests')
           .doc('${_currentMonth}_${widget.teacherName}')
           .set({
@@ -227,7 +313,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isCommonSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('common_prayers')
           .doc(_currentMonth)
           .set({
@@ -257,7 +344,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
     setState(() => _isUrgentSaving = true);
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('urgent_prayers')
           .add({
             'month': _currentMonth,
@@ -283,7 +371,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Future<void> _deleteUrgentPrayer(String docId) async {
     try {
       await FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('urgent_prayers')
           .doc(docId)
           .delete();
@@ -303,33 +392,29 @@ class _PrayerScreenState extends State<PrayerScreen> {
     final fontBold = await PdfGoogleFonts.notoSansKRBold();
 
     final prayerSnapshot = await FirebaseFirestore.instance
-        .collection('departments').doc('중등부')
+        .collection('departments')
+        .doc('중등부')
         .collection('prayer_requests')
         .get();
 
     final urgentSnapshot = await FirebaseFirestore.instance
-        .collection('departments').doc('중등부')
+        .collection('departments')
+        .doc('중등부')
         .collection('urgent_prayers')
         .get();
 
     final allRequests = prayerSnapshot.docs
-        .where(
-          (doc) => doc.get('month') == _currentMonth,
-        )
+        .where((doc) => doc.get('month') == _currentMonth)
         .toList();
 
     final urgentRequests = urgentSnapshot.docs
-        .where(
-          (doc) => doc.get('month') == _currentMonth,
-        )
+        .where((doc) => doc.get('month') == _currentMonth)
         .toList();
 
     allRequests.sort((a, b) {
       final Timestamp? aTime = a.get('updatedAt');
       final Timestamp? bTime = b.get('updatedAt');
-      return (bTime ?? Timestamp.now()).compareTo(
-        aTime ?? Timestamp.now(),
-      );
+      return (bTime ?? Timestamp.now()).compareTo(aTime ?? Timestamp.now());
     });
 
     pdf.addPage(
@@ -425,22 +510,19 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       '$idx. $name ($roleInfo)',
                       style: pw.TextStyle(font: fontBold, fontSize: 12),
                     ),
-                    ...contents
-                        .asMap()
-                        .entries
-                        .map(
-                          (cEntry) => pw.Padding(
-                            padding: const pw.EdgeInsets.only(left: 12, top: 2),
-                            child: pw.Text(
-                              '- ${cEntry.key + 1}. ${_cleanText(cEntry.value.toString())}',
-                              style: pw.TextStyle(
-                                font: font,
-                                fontSize: 10,
-                                lineSpacing: 1.2,
-                              ),
-                            ),
+                    ...contents.asMap().entries.map(
+                      (cEntry) => pw.Padding(
+                        padding: const pw.EdgeInsets.only(left: 12, top: 2),
+                        child: pw.Text(
+                          '- ${cEntry.key + 1}. ${_cleanText(cEntry.value.toString())}',
+                          style: pw.TextStyle(
+                            font: font,
+                            fontSize: 10,
+                            lineSpacing: 1.2,
                           ),
                         ),
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -478,21 +560,21 @@ class _PrayerScreenState extends State<PrayerScreen> {
                         icon: const Icon(
                           Icons.picture_as_pdf,
                           color: Colors.redAccent,
-                          size: 18, 
+                          size: 18,
                         ),
                         label: const Text(
                           'PDF 출력',
                           style: TextStyle(
                             color: Colors.redAccent,
-                            fontSize: 14, 
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.red.shade50,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12, 
-                            vertical: 8, 
+                            horizontal: 12,
+                            vertical: 8,
                           ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -545,7 +627,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
       child: Center(
         child: TextButton.icon(
           onPressed: _scrollToTop,
-          icon: const Icon(Icons.arrow_upward_rounded, size: 20, color: Colors.teal),
+          icon: const Icon(
+            Icons.arrow_upward_rounded,
+            size: 20,
+            color: Colors.teal,
+          ),
           label: const Text(
             "맨 위로 이동",
             style: TextStyle(
@@ -602,10 +688,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(
               hintText: '긴급히 함께 기도할 제목을 입력하세요',
-              hintStyle: TextStyle(
-                color: Colors.red.shade200,
-                fontSize: 13,
-              ),
+              hintStyle: TextStyle(color: Colors.red.shade200, fontSize: 13),
               isDense: true,
               border: InputBorder.none,
             ),
@@ -647,7 +730,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildUrgentStreamArea() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('urgent_prayers')
           .snapshots(),
       builder: (context, snapshot) {
@@ -656,9 +740,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
         }
 
         final docs = snapshot.data!.docs
-            .where(
-              (doc) => doc.get('month') == _currentMonth,
-            )
+            .where((doc) => doc.get('month') == _currentMonth)
             .toList();
         if (docs.isEmpty) {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -726,22 +808,26 @@ class _PrayerScreenState extends State<PrayerScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.calendar_month, color: Colors.teal, size: 18), 
+        const Icon(Icons.calendar_month, color: Colors.teal, size: 18),
         const SizedBox(width: 6),
         Container(
-          height: 38, 
-          padding: const EdgeInsets.symmetric(horizontal: 10), 
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.teal.shade200, width: 1.0), 
+            border: Border.all(color: Colors.teal.shade200, width: 1.0),
             color: Colors.white,
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _currentMonth,
-              icon: const Icon(Icons.arrow_drop_down, size: 24, color: Colors.teal), 
+              icon: const Icon(
+                Icons.arrow_drop_down,
+                size: 24,
+                color: Colors.teal,
+              ),
               style: const TextStyle(
-                fontSize: 16, 
+                fontSize: 16,
                 color: Colors.black87,
                 fontWeight: FontWeight.bold,
               ),
@@ -819,54 +905,54 @@ class _PrayerScreenState extends State<PrayerScreen> {
           const SizedBox(height: 10),
           if (_isAdmin)
             ..._commonControllers.asMap().entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: entry.value,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 4,
-                              ),
-                              prefixText: '${entry.key + 1}. ',
-                              hintText: '공동 기도제목 입력',
-                            ),
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: entry.value,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: const TextStyle(fontSize: 14),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 4,
                           ),
+                          prefixText: '${entry.key + 1}. ',
+                          hintText: '공동 기도제목 입력',
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_circle,
-                            color: Colors.redAccent,
-                            size: 18,
-                          ),
-                          onPressed: () => _removeCommonField(entry.key),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-          else
-            ..._commonControllers.asMap().entries.map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '${entry.key + 1}. ${_cleanText(entry.value.text)}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.teal.shade800,
-                        height: 1.4,
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.remove_circle,
+                        color: Colors.redAccent,
+                        size: 18,
+                      ),
+                      onPressed: () => _removeCommonField(entry.key),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._commonControllers.asMap().entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '${entry.key + 1}. ${_cleanText(entry.value.text)}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.teal.shade800,
+                    height: 1.4,
                   ),
                 ),
+              ),
+            ),
           if (_isAdmin) ...[
             const SizedBox(height: 8),
             SizedBox(
@@ -1006,7 +1092,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
   Widget _buildTotalStreamList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('departments').doc('중등부')
+          .collection('departments')
+          .doc('중등부')
           .collection('prayer_requests')
           .snapshots(),
       builder: (context, snapshot) {
@@ -1017,17 +1104,13 @@ class _PrayerScreenState extends State<PrayerScreen> {
         }
 
         final docs = snapshot.data!.docs
-            .where(
-              (doc) => doc.get('month') == _currentMonth,
-            )
+            .where((doc) => doc.get('month') == _currentMonth)
             .toList();
 
         docs.sort((a, b) {
           final Timestamp? aTime = a.get('updatedAt');
           final Timestamp? bTime = b.get('updatedAt');
-          return (bTime ?? Timestamp.now()).compareTo(
-            aTime ?? Timestamp.now(),
-          );
+          return (bTime ?? Timestamp.now()).compareTo(aTime ?? Timestamp.now());
         });
 
         if (docs.isEmpty) {
@@ -1088,18 +1171,18 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   ),
                   const SizedBox(height: 6),
                   ...contents.asMap().entries.map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '${e.key + 1}. ${_cleanText(e.value.toString())}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
-                              height: 1.5,
-                            ),
-                          ),
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        '${e.key + 1}. ${_cleanText(e.value.toString())}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                          height: 1.5,
                         ),
                       ),
+                    ),
+                  ),
                 ],
               ),
             );
