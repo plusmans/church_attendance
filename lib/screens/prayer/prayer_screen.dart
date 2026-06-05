@@ -134,22 +134,27 @@ class _PrayerScreenState extends State<PrayerScreen> {
           if (pastQuery.docs.isNotEmpty) {
             // 현재 달(_currentMonth)보다 이전 달의 데이터만 필터링
             final pastDocs = pastQuery.docs.where((d) {
-              final month = d.data().containsKey('month')
-                  ? d.get('month') as String
+              final data = d.data() as Map<String, dynamic>?;
+              if (data == null) return false;
+              final month = data.containsKey('month')
+                  ? data['month'] as String
                   : '';
               return month.isNotEmpty && month.compareTo(_currentMonth) < 0;
             }).toList();
 
             if (pastDocs.isNotEmpty) {
               // 최신 달 순서로 정렬 (내림차순)
-              pastDocs.sort(
-                (a, b) => (b.get('month') as String).compareTo(
-                  a.get('month') as String,
-                ),
-              );
+              pastDocs.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>? ?? {};
+                final bData = b.data() as Map<String, dynamic>? ?? {};
+                return (bData['month'] as String? ?? '').compareTo(
+                  aData['month'] as String? ?? '',
+                );
+              });
 
-              final List<dynamic> recentContent =
-                  pastDocs.first.get('content') ?? [];
+              final recentData =
+                  pastDocs.first.data() as Map<String, dynamic>? ?? {};
+              final List<dynamic> recentContent = recentData['content'] ?? [];
               setState(() {
                 _controllers = recentContent.isNotEmpty
                     ? recentContent
@@ -205,22 +210,27 @@ class _PrayerScreenState extends State<PrayerScreen> {
           if (pastQuery.docs.isNotEmpty) {
             // 현재 달(_currentMonth)보다 이전 달의 데이터만 필터링
             final pastDocs = pastQuery.docs.where((d) {
-              final month = d.data().containsKey('month')
-                  ? d.get('month') as String
+              final data = d.data() as Map<String, dynamic>?;
+              if (data == null) return false;
+              final month = data.containsKey('month')
+                  ? data['month'] as String
                   : '';
               return month.isNotEmpty && month.compareTo(_currentMonth) < 0;
             }).toList();
 
             if (pastDocs.isNotEmpty) {
               // 최신 달 순서로 정렬 (내림차순)
-              pastDocs.sort(
-                (a, b) => (b.get('month') as String).compareTo(
-                  a.get('month') as String,
-                ),
-              );
+              pastDocs.sort((a, b) {
+                final aData = a.data() as Map<String, dynamic>? ?? {};
+                final bData = b.data() as Map<String, dynamic>? ?? {};
+                return (bData['month'] as String? ?? '').compareTo(
+                  aData['month'] as String? ?? '',
+                );
+              });
 
-              final List<dynamic> recentTopics =
-                  pastDocs.first.get('topics') ?? [];
+              final recentData =
+                  pastDocs.first.data() as Map<String, dynamic>? ?? {};
+              final List<dynamic> recentTopics = recentData['topics'] ?? [];
               setState(() {
                 _commonControllers = recentTopics.isNotEmpty
                     ? recentTopics
@@ -403,17 +413,21 @@ class _PrayerScreenState extends State<PrayerScreen> {
         .collection('urgent_prayers')
         .get();
 
-    final allRequests = prayerSnapshot.docs
-        .where((doc) => doc.get('month') == _currentMonth)
-        .toList();
+    final allRequests = prayerSnapshot.docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>?;
+      return data != null && data['month'] == _currentMonth;
+    }).toList();
 
-    final urgentRequests = urgentSnapshot.docs
-        .where((doc) => doc.get('month') == _currentMonth)
-        .toList();
+    final urgentRequests = urgentSnapshot.docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>?;
+      return data != null && data['month'] == _currentMonth;
+    }).toList();
 
     allRequests.sort((a, b) {
-      final Timestamp? aTime = a.get('updatedAt');
-      final Timestamp? bTime = b.get('updatedAt');
+      final aData = a.data() as Map<String, dynamic>? ?? {};
+      final bData = b.data() as Map<String, dynamic>? ?? {};
+      final Timestamp? aTime = aData['updatedAt'] as Timestamp?;
+      final Timestamp? bTime = bData['updatedAt'] as Timestamp?;
       return (bTime ?? Timestamp.now()).compareTo(aTime ?? Timestamp.now());
     });
 
@@ -474,10 +488,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
               ),
               pw.Divider(color: PdfColors.red100),
               ...urgentRequests.map((u) {
+                final data = u.data() as Map<String, dynamic>? ?? {};
                 return pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 8),
                   child: pw.Text(
-                    '• ${u.get('content')} (${u.get('authorName')} ${u.get('authorRole')})',
+                    '• ${data['content']} (${data['authorName']} ${data['authorRole']})',
                     style: pw.TextStyle(
                       font: font,
                       fontSize: 10,
@@ -495,10 +510,11 @@ class _PrayerScreenState extends State<PrayerScreen> {
             pw.Divider(thickness: 0.5),
             ...allRequests.asMap().entries.map((entry) {
               final doc = entry.value;
+              final data = doc.data() as Map<String, dynamic>? ?? {};
               final idx = entry.key + 1;
-              final name = _cleanName(doc.get('teacherName') ?? '교사');
-              final roleInfo = doc.get('cell') ?? '-';
-              final List<dynamic> contents = doc.get('content') ?? [];
+              final name = _cleanName(data['teacherName'] ?? '교사');
+              final roleInfo = data['cell'] ?? '-';
+              final List<dynamic> contents = data['content'] ?? [];
 
               return pw.Container(
                 margin: const pw.EdgeInsets.only(bottom: 12),
@@ -739,9 +755,10 @@ class _PrayerScreenState extends State<PrayerScreen> {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
         }
 
-        final docs = snapshot.data!.docs
-            .where((doc) => doc.get('month') == _currentMonth)
-            .toList();
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          return data != null && data['month'] == _currentMonth;
+        }).toList();
         if (docs.isEmpty) {
           return const SliverToBoxAdapter(child: SizedBox.shrink());
         }
@@ -767,8 +784,9 @@ class _PrayerScreenState extends State<PrayerScreen> {
                 ),
                 const SizedBox(height: 6),
                 ...docs.map((d) {
+                  final data = d.data() as Map<String, dynamic>? ?? {};
                   final bool canDelete =
-                      _isAdmin || d.get('authorName') == widget.teacherName;
+                      _isAdmin || data['authorName'] == widget.teacherName;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
@@ -776,7 +794,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '• ${d.get('content')} (${d.get('authorName')})',
+                            '• ${data['content']} (${data['authorName']})',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.black87,
@@ -1103,13 +1121,16 @@ class _PrayerScreenState extends State<PrayerScreen> {
           );
         }
 
-        final docs = snapshot.data!.docs
-            .where((doc) => doc.get('month') == _currentMonth)
-            .toList();
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>?;
+          return data != null && data['month'] == _currentMonth;
+        }).toList();
 
         docs.sort((a, b) {
-          final Timestamp? aTime = a.get('updatedAt');
-          final Timestamp? bTime = b.get('updatedAt');
+          final aData = a.data() as Map<String, dynamic>? ?? {};
+          final bData = b.data() as Map<String, dynamic>? ?? {};
+          final Timestamp? aTime = aData['updatedAt'] as Timestamp?;
+          final Timestamp? bTime = bData['updatedAt'] as Timestamp?;
           return (bTime ?? Timestamp.now()).compareTo(aTime ?? Timestamp.now());
         });
 
@@ -1130,7 +1151,8 @@ class _PrayerScreenState extends State<PrayerScreen> {
         return SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
             final doc = docs[index];
-            final List<dynamic> contents = doc.get('content') ?? [];
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            final List<dynamic> contents = data['content'] ?? [];
             return Container(
               margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               padding: const EdgeInsets.all(14),
@@ -1152,7 +1174,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                   Row(
                     children: [
                       Text(
-                        '${index + 1}. ${_cleanName(doc.get('teacherName') ?? '교사')}',
+                        '${index + 1}. ${_cleanName(data['teacherName'] ?? '교사')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -1160,7 +1182,7 @@ class _PrayerScreenState extends State<PrayerScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        (doc.get('cell') ?? '-').toString(),
+                        (data['cell'] ?? '-').toString(),
                         style: TextStyle(
                           color: Colors.teal.shade600,
                           fontSize: 12,

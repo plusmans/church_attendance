@@ -63,7 +63,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
     // 1. 앱이 실행 중(Foreground)일 때 푸시 알림 수신 처리
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('📳 포그라운드 메시지 수신: ${message.notification?.title}');
-      if (message.notification != null && context.mounted) {
+      if (message.notification != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -124,7 +124,11 @@ class _HomeNavigationState extends State<HomeNavigation> {
 
       // 2. 알림을 허용했다면 기기 고유 토큰(fcmToken) 발급
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        String? token = await messaging.getToken();
+        // ✅ 웹 푸시 알림을 위한 VAPID 키 추가 (파이어베이스 콘솔에서 복사한 키를 넣으세요)
+        String? token = await messaging.getToken(
+          vapidKey:
+              'BE06FNoDlTip6c1gsTv3VbvqYFQk2MPwIPsMotC87Aurguw_oWALfmGvYVM25KkQ_zvDP9N_Yiy0OVD6iyGgJ9M',
+        );
 
         if (token != null) {
           // 3. 앞서 변경한 '중등부' 전용 경로의 선생님 문서에 토큰값만 병합 업데이트
@@ -186,10 +190,15 @@ class _HomeNavigationState extends State<HomeNavigation> {
   }
 
   // 💡 로그아웃 확인 팝업창
-  void _showLogoutDialog(BuildContext context) {
+  // ✅ 매개변수로 BuildContext를 지워 섀도잉(Shadowing) 경고를 해결합니다.
+  void _showLogoutDialog() {
+    // ✅ 비동기 작업(await) 전에 Navigator 상태를 미리 저장하여 Async gap 에러 방지
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        // ✅ 변수명 중복(shadowing) 방지를 위해 dialogContext로 변경
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Text(
           '로그아웃',
@@ -198,7 +207,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
         content: const Text('정말 로그아웃 하시겠습니까?', style: TextStyle(fontSize: 14)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('취소', style: TextStyle(color: Colors.grey)),
           ),
           TextButton(
@@ -216,7 +225,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
               }
 
               await FirebaseAuth.instance.signOut();
-              if (context.mounted) Navigator.pop(context);
+              navigator.pop(); // ✅ 저장해둔 navigator를 사용하여 안전하게 팝업 닫기
             },
             child: const Text(
               '로그아웃',
@@ -343,14 +352,13 @@ class _HomeNavigationState extends State<HomeNavigation> {
             icon: const Icon(Icons.notification_add, color: Colors.amber),
             tooltip: '알림 수신 설정 갱신',
             onPressed: () async {
+              // ✅ 비동기 작업 전에 Messenger를 미리 확보하여 context 에러를 완벽히 차단합니다.
+              final messenger = ScaffoldMessenger.of(context);
               await _updateTeacherToken(); // initState에 있던 토큰 갱신 함수 수동 호출
 
-              // 💡 mounted 대신 context.mounted를 사용하여 비동기 갭(Async gap) 경고 해결
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('🔔 알림 수신 설정이 갱신되었습니다.')),
-                );
-              }
+              messenger.showSnackBar(
+                const SnackBar(content: Text('🔔 알림 수신 설정이 갱신되었습니다.')),
+              );
             },
           ),
           IconButton(
@@ -362,7 +370,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
               color: Colors.white70,
             ),
             tooltip: '로그아웃',
-            onPressed: () => _showLogoutDialog(context),
+            onPressed: _showLogoutDialog, // ✅ 불필요한 context 전달 제거
           ),
 
           const SizedBox(width: 4),
