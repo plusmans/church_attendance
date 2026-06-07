@@ -87,8 +87,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
     ) {
       if (message != null) {
         debugPrint('알림 탭(종료): ${message.data}');
-        // 위젯 빌드가 완료된 후에 상태를 변경하기 위해 약간의 지연을 줌
-        Future.delayed(const Duration(milliseconds: 100), () {
+        // ✅ 위젯 트리가 모두 렌더링 된 직후에 안전하게 상태 변경
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           _handleNotificationNavigation(message.data);
         });
       }
@@ -111,7 +111,7 @@ class _HomeNavigationState extends State<HomeNavigation> {
   }
 
   // ✅ 선생님 FCM 토큰 수집 로직 (알림 발송은 안 함, 주소록만 저장)
-  Future<void> _updateTeacherToken() async {
+  Future<bool> _updateTeacherToken() async {
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
 
@@ -123,7 +123,8 @@ class _HomeNavigationState extends State<HomeNavigation> {
       );
 
       // 2. 알림을 허용했다면 기기 고유 토큰(fcmToken) 발급
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
         // ✅ 웹 푸시 알림을 위한 VAPID 키 추가 (파이어베이스 콘솔에서 복사한 키를 넣으세요)
         String? token = await messaging.getToken(
           vapidKey:
@@ -137,24 +138,31 @@ class _HomeNavigationState extends State<HomeNavigation> {
               .doc('중등부')
               .collection('teachers')
               .doc(widget.docId) // 현재 로그인한 선생님의 고유 문서 ID
-              .update({
+              .set({
                 'fcmToken': token, // 앞서 일괄 생성한 빈칸을 실제 토큰으로 채움
-              });
+              }, SetOptions(merge: true)); // ✅ update 대신 안전한 병합 저장 사용
           debugPrint("✅ 실제 FCM 토큰 업데이트 완료");
+          return true;
         }
+      } else {
+        debugPrint("❌ 알림 권한이 거부되었습니다.");
       }
     } catch (e) {
       debugPrint("❌ 토큰 업데이트 실패: $e");
     }
+    return false;
   }
 
   // ✅ 알림 데이터에 따라 화면 이동 처리
   void _handleNotificationNavigation(Map<String, dynamic> data) {
     // 'screen' 데이터가 'prayer_screen'이면 기도 페이지로 이동
     if (data['screen'] == 'prayer_screen') {
-      setState(() {
-        _selectedIndex = 3; // 기도 화면의 인덱스 (0:현황, 1:출석, 2:관리, 3:기도)
-      });
+      if (mounted) {
+        setState(() {
+          _selectedIndex = 3; // 기도 화면의 인덱스 (0:현황, 1:출석, 2:관리, 3:기도)
+          _buildScreens(); // ✅ 탭 이동 시 화면 목록도 안전하게 다시 빌드
+        });
+      }
     }
   }
 
@@ -354,11 +362,38 @@ class _HomeNavigationState extends State<HomeNavigation> {
             onPressed: () async {
               // ✅ 비동기 작업 전에 Messenger를 미리 확보하여 context 에러를 완벽히 차단합니다.
               final messenger = ScaffoldMessenger.of(context);
-              await _updateTeacherToken(); // initState에 있던 토큰 갱신 함수 수동 호출
+              bool isSuccess = await _updateTeacherToken(); // 토큰 갱신 성공 여부 확인
 
-              messenger.showSnackBar(
-                const SnackBar(content: Text('🔔 알림 수신 설정이 갱신되었습니다.')),
-              );
+              if (isSuccess) {
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('🔔 알림 수신 설정이 갱신되었습니다.')),
+                );
+              } else {
+                // ✅ 권한이 차단된 경우 스낵바 대신 확실한 팝업(Dialog)으로 안내합니다.
+                if (!mounted) return;
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text(
+                      '알림 권한 안내',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    content: const Text(
+                      '기기 알림 권한이 차단되어 있습니다.\n\n스마트폰의 [설정] > [애플리케이션] > [성문교회 앱]에서 알림을 직접 허용하신 후 다시 시도해주세요.',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('확인'),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
           ),
           IconButton(
